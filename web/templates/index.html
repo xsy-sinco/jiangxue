@@ -294,6 +294,40 @@
     </div>
   </section>
 
+  <!-- ====== 荣誉榜 ====== -->
+  <section x-show="data && data.award_meta" class="panel p-4 mb-4">
+    <h2 class="font-bold text-gold mb-3 flex items-center gap-2">
+      <span class="w-1 h-4 bg-gold rounded"></span> 🏆 荣誉榜
+      <span class="text-xs text-muted font-normal">近 30 天各奖项次数 · Top 5</span>
+    </h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+      <template x-for="a in data.award_meta" :key="a.key">
+        <div class="bg-panel2 rounded-lg p-3 border border-border">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-lg" x-text="a.emoji"></span>
+            <span class="text-sm font-bold" x-text="a.label"></span>
+          </div>
+          <ol class="space-y-1" x-show="honorLeaderboard(a.key).length">
+            <template x-for="(p, i) in honorLeaderboard(a.key)" :key="p.account_id">
+              <li class="flex items-center gap-2 text-xs">
+                <span class="w-4 text-center font-mono"
+                      :class="i===0 ? 'text-gold font-bold' : 'text-muted'" x-text="i+1"></span>
+                <a :href="`/player/${p.account_id}`"
+                   class="flex-1 truncate hover:text-gold"
+                   :class="i===0 ? 'font-bold text-white' : 'text-muted'"
+                   x-text="p.name"></a>
+                <span class="font-mono font-bold shrink-0"
+                      :class="i===0 ? 'text-gold' : 'text-muted'"
+                      x-text="p.count + ' 次'"></span>
+              </li>
+            </template>
+          </ol>
+          <div x-show="!honorLeaderboard(a.key).length" class="text-xs text-muted py-2">暂无</div>
+        </div>
+      </template>
+    </div>
+  </section>
+
   <!-- ====== TABS ====== -->
   <nav id="tabs-nav" x-show="data" class="flex gap-1 mb-4 border-b border-border">
     <template x-for="t in ['players','heroes','matches']">
@@ -486,6 +520,13 @@
               <span class="text-muted" x-text="m.start_time"></span>
               <span class="text-muted">·</span>
               <span class="text-muted">时长 <span class="font-mono text-white" x-text="m.duration"></span></span>
+              <template x-if="m.awards">
+                <span class="hidden sm:flex items-center gap-1" title="本场综合 MVP">
+                  <span>👑</span>
+                  <img :src="m.players[m.awards.mvp].hero_icon" class="w-4 h-4 rounded" loading="lazy"/>
+                  <span class="text-gold font-bold truncate max-w-[100px]" x-text="m.players[m.awards.mvp].name"></span>
+                </span>
+              </template>
             </div>
             <div class="flex items-center gap-3">
               <span class="font-mono text-sm">
@@ -635,6 +676,22 @@
           </div>
         </div>
 
+        <!-- 荣誉墙 -->
+        <div class="mb-5" x-show="drawerPlayer.awards && data.award_meta">
+          <div class="text-xs text-muted uppercase tracking-wider mb-2">🏆 荣誉墙</div>
+          <div class="grid grid-cols-2 gap-2">
+            <template x-for="a in (data.award_meta || []).filter(a => (drawerPlayer.awards?.[a.key]||0) > 0)" :key="a.key">
+              <div class="flex items-center gap-2 bg-panel2 p-2 rounded">
+                <span class="text-lg" x-text="a.emoji"></span>
+                <span class="text-xs flex-1 truncate" x-text="a.label"></span>
+                <span class="text-sm font-bold text-gold font-mono" x-text="drawerPlayer.awards[a.key]"></span>
+              </div>
+            </template>
+          </div>
+          <div x-show="!(data.award_meta || []).some(a => (drawerPlayer.awards?.[a.key]||0) > 0)"
+               class="text-xs text-muted py-2">还没有获得过荣誉</div>
+        </div>
+
         <!-- Top heroes -->
         <div>
           <div class="text-xs text-muted uppercase tracking-wider mb-2">
@@ -718,6 +775,7 @@
               {icon:'💔', label:'败方 MVP',    player: matchAwards(selectedMatch).loserMvp,    color:'text-direhi',    sub: (p) => p.kills+'/'+p.deaths+'/'+p.assists+' · '+Math.round(p.hero_damage/1000)+'K伤害'},
               {icon:'⚔️', label:'最多击杀',    player: matchAwards(selectedMatch).mostKills,   color:'text-gold',      sub: (p) => p.kills+' 击杀'},
               {icon:'🤝', label:'最多助攻',    player: matchAwards(selectedMatch).mostAssists, color:'text-gold',      sub: (p) => p.assists+' 助攻'},
+              {icon:'🎭', label:'演员',        player: matchAwards(selectedMatch).actor,       color:'text-direhi',    sub: (p) => p.deaths+' 次死亡'},
             ]" :key="award.label">
               <div class="bg-panel2 rounded p-3 border-l-2"
                    :class="award.player.win ? 'border-radiant' : 'border-dire'">
@@ -809,6 +867,7 @@ function dashboard() {
     error: null,
     updatedAt: null,
     progress: {phase:'idle', current:0, total:0, message:''},
+    honors30d: {},   // 近30天荣誉累计 {account_id: {award_key: count}}
 
     tab: 'players',
     tabLabels: {players:'玩家排行', heroes:'英雄数据', matches:'对局列表'},
@@ -888,8 +947,9 @@ function dashboard() {
       this.error = j.error;
       if (this.data) {
         this._heroByName = Object.fromEntries(this.data.heroes.map(h => [h.name, h.icon]));
-        this._enrichPlayers();
+        // 实力分 / 场均 / 荣誉次数现在由后端 serialize 算好，直接读 player.skill_score 等
         this._computeRankChanges();
+        this._computeHonors30d();
         // 等 Alpine 把 x-show 翻成可见 + 浏览器跑完 layout 再画图
         this.$nextTick(() => {
           requestAnimationFrame(() => this.drawCharts());
@@ -897,35 +957,8 @@ function dashboard() {
       }
     },
 
-    // 单场玩家综合分（实力榜 + 对局详情 MVP 都用这一把尺）
-    //
-    // v4：carry / support 平衡版（在 v2 carry 偏重 / v3 support 偏重之间取中间值）
-    //   - 击杀 ×1.7（v2=1.5, v3=1.5）   ← carry 主要输出，略提
-    //   - 助攻 ×2.0（v2=1.2, v3=2.5）   ← support 主要贡献，保留较高权重
-    //   - 死亡 ×0.5                     ← 不变
-    //   - 英雄伤害 /100（v2=100, v3=110）← 回到 v2，carry 友好
-    //   - 推塔 /45 （v2=50,  v3=40）    ← 中间值
-    //   - 治疗 /80 （v2=150, v3=60）    ← 中间，奶妈仍有不错奖励
-    //   - GPM ×1.2 （v2=1.2, v3=1.0）   ← 回到 v2，carry 友好
-    //   - XPM ×0.8 （v2=0.8, v3=0.7）   ← 回到 v2
-    //   - 补刀 ×0.2（v2=0.25, v3=0.15）  ← 中间值
-    //   - 反补 ×2.5（v2=1.8, v3=3）     ← 中间，support 对线信号
-    //   - 净值 /900（v2=800, v3=1200）  ← 中间偏 carry
-    //   - 等级 ×2.8（v2=3,   v3=2.5）   ← 中间
-    //   - 胜场 +100（v2=80,  v3=100）   ← 保留 v3
-    _perMatchScore(p) {
-      return (p.kills * 1.7 + p.assists * 2.0 - p.deaths * 0.5) * 80
-           + (p.hero_damage   || 0) / 100
-           + (p.tower_damage  || 0) / 45
-           + (p.hero_healing  || 0) / 80
-           + (p.gpm           || 0) * 1.2
-           + (p.xpm           || 0) * 0.8
-           + (p.last_hits     || 0) * 0.2
-           + (p.denies        || 0) * 2.5
-           + (p.net_worth     || 0) / 900
-           + (p.level         || 0) * 2.8
-           + (p.win ? 100 : 0);
-    },
+    // 综合评分公式已收口到后端 src/awards.py（per_match_score）。
+    // 前端只读 player.skill_score / p.score，不再自己算。
 
     // 跟"昨天"对比 skill_score 排名变化（用 localStorage 保存每日快照）
     _computeRankChanges() {
@@ -984,43 +1017,6 @@ function dashboard() {
 
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snap)); }
       catch (e) { /* localStorage 满了或被禁用都不致命 */ }
-    },
-
-    _enrichPlayers() {
-      // 从 matches.players 里算每个玩家的实力分 + 几个 backend 没给的平均值
-      if (!this.data?.players?.length || !this.data?.matches?.length) return;
-      const tot = {};
-      for (const m of this.data.matches) {
-        for (const p of m.players || []) {
-          if (!p.account_id) continue;
-          if (!tot[p.account_id]) tot[p.account_id] = { s:0, gpm:0, hd:0, td:0, heal:0, dn:0, nw:0, xpm:0, n:0 };
-          const t = tot[p.account_id];
-          t.s += this._perMatchScore(p);
-          t.gpm  += p.gpm           || 0;
-          t.xpm  += p.xpm           || 0;
-          t.hd   += p.hero_damage   || 0;
-          t.td   += p.tower_damage  || 0;
-          t.heal += p.hero_healing  || 0;
-          t.dn   += p.denies        || 0;
-          t.nw   += p.net_worth     || 0;
-          t.n++;
-        }
-      }
-      for (const p of this.data.players) {
-        const t = tot[p.account_id];
-        if (t && t.n) {
-          p.skill_score        = Math.round(t.s   / t.n);
-          p.avg_gpm            = Math.round(t.gpm / t.n);
-          p.avg_xpm            = Math.round(t.xpm / t.n);
-          p.avg_hero_damage    = Math.round(t.hd  / t.n);
-          p.avg_tower_damage   = Math.round(t.td  / t.n);
-          p.avg_hero_healing   = Math.round(t.heal/ t.n);
-          p.avg_denies         = Math.round(t.dn  / t.n * 10) / 10;
-          p.avg_net_worth      = Math.round(t.nw  / t.n);
-        } else {
-          p.skill_score = 0;
-        }
-      }
     },
 
     async _pollProgress() {
@@ -1260,36 +1256,44 @@ function dashboard() {
       });
     },
 
-    // 单场比赛颁奖
+    // 单场颁奖：后端已算好 {award_key -> players 下标}，这里解析成玩家对象
     matchAwards(match) {
-      if (!match?.players?.length) return null;
-      // 综合表现分：跟玩家榜实力分用同一公式（11 个维度）
-      const score = (p) => this._perMatchScore(p);
-      // 最C分：净值 + 英雄伤害（carry 特征）
-      const cScore = (p) => p.net_worth / 1000 + p.hero_damage / 100;
-      const winners = match.players.filter(p => p.win);
-      const losers  = match.players.filter(p => !p.win);
-      const maxBy = (arr, fn) => arr.reduce((a, b) => fn(b) > fn(a) ? b : a);
-      const minBy = (arr, fn) => arr.reduce((a, b) => fn(b) < fn(a) ? b : a);
-      if (!winners.length || !losers.length) return null;
-      return {
-        mvp:         maxBy(winners, score),
-        loserMvp:    maxBy(losers, score),
-        carry:       maxBy(winners, cScore),
-        carried:     minBy(winners, score),
-        mostKills:   maxBy(match.players, p => p.kills),
-        mostAssists: maxBy(match.players, p => p.assists),
-        // 每个玩家算分，方便表里显示评分
-        scores: Object.fromEntries(match.players.map(p => [
-          p.account_id + '_' + p.hero_id, Math.round(score(p)),
-        ])),
-      };
+      const a = match?.awards;
+      if (!a || !match.players?.length) return null;
+      const out = {};
+      for (const k in a) out[k] = match.players[a[k]];
+      return out;
     },
 
+    // 单场综合分：后端已算进每个玩家的 p.score
     matchPlayerScore(match, p) {
-      const a = this.matchAwards(match);
-      if (!a) return 0;
-      return a.scores[p.account_id + '_' + p.hero_id] || 0;
+      return p.score || 0;
+    },
+
+    // 近30天荣誉累计：从 match.awards（后端给的下标）按时间窗重算
+    _computeHonors30d() {
+      const h = {};
+      const cutoff = Math.floor(Date.now() / 1000) - 30 * 86400;
+      for (const m of this.data?.matches || []) {
+        if ((m.start_ts || 0) < cutoff || !m.awards) continue;
+        for (const key in m.awards) {
+          const aid = m.players[m.awards[key]]?.account_id;
+          if (!aid) continue;
+          (h[aid] || (h[aid] = {}))[key] = (h[aid][key] || 0) + 1;
+        }
+      }
+      this.honors30d = h;
+    },
+
+    // 荣誉榜（近30天）：某个奖项拿得最多的前 n 名玩家（次数 > 0）
+    honorLeaderboard(key, n = 5) {
+      if (!this.data?.players) return [];
+      const h = this.honors30d || {};
+      return this.data.players
+        .map(p => ({ account_id: p.account_id, name: p.name, count: h[p.account_id]?.[key] || 0 }))
+        .filter(x => x.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, n);
     },
 
     // ---- sorting ----

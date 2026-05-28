@@ -33,10 +33,6 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 # Session 签名密钥。生产环境必须设 FLASK_SECRET_KEY 环境变量。
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-in-prod-please")
 
-# 请求体上限：放行集锦视频单文件上限（默认 200MB）+ 余量，超过直接 413
-_MB = 1024 * 1024
-app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("HIGHLIGHT_MAX_MB", "200")) * _MB + 16 * _MB
-
 # 信任反代的 X-Forwarded-Proto 等头，让 url_for(_external=True) 生成 https
 try:
     from werkzeug.middleware.proxy_fix import ProxyFix
@@ -52,12 +48,10 @@ except ImportError:
     pass  # 服务器没装就跳过，不致命
 
 # 注册社区蓝图
-from web import auth, community_api, db, transcode  # noqa: E402
+from web import auth, community_api, db  # noqa: E402
 app.register_blueprint(auth.bp)
 app.register_blueprint(community_api.bp)
 db.init_db()
-# 服务重启后，续跑被中断的转码任务（无 ffmpeg 时是 no-op）
-transcode.requeue_unfinished()
 
 # ---------- 状态：进度 + 数据 ----------
 

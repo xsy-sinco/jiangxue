@@ -1,0 +1,26 @@
+# 同样：steam_api_key 不进镜像
+config.json
+matches.txt
+
+# 缓存与产物（容器内会重新生成 / 用 volume 挂载）
+data/
+output/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# 版本控制和 IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# 文档（运行不需要）
+*.md
+!README.md

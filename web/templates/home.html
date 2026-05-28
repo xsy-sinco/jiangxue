@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🏆 江雪杯</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0e1a'/><text x='50' y='72' font-size='70' text-anchor='middle' fill='%23c8aa6e'>%F0%9F%8F%86</text></svg>" />
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: {
+      bg: '#0a0e1a', panel: '#141a2a', panel2: '#1c2338', border: '#2a3148',
+      gold: '#c8aa6e', goldhi: '#f0d486', radiant: '#92a629', radianthi: '#b5cf3b',
+      dire: '#c23c2a', direhi: '#e85a45', muted: '#7a8499',
+    }}}};
+  </script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+  <style>
+    body {
+      background:
+        radial-gradient(circle at 20% 0%, rgba(146,166,41,.08), transparent 40%),
+        radial-gradient(circle at 80% 100%, rgba(194,60,42,.08), transparent 40%),
+        linear-gradient(180deg, #0a0e1a, #06090f);
+      color: #e8eaed; min-height: 100vh;
+      font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    .panel {
+      background: linear-gradient(180deg, rgba(28,35,56,.85), rgba(20,26,42,.85));
+      border: 1px solid #2a3148; border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .gold-text {
+      background: linear-gradient(180deg, #f0d486 0%, #c8aa6e 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-icon-sm {
+      width: 28px; height: 28px; border-radius: 4px;
+      border: 1px solid #2a3148; object-fit: cover;
+    }
+    .hero-icon-md {
+      width: 34px; height: 34px; border-radius: 5px;
+      border: 1px solid #2a3148; object-fit: cover;
+    }
+    .player-card { transition: all .2s; }
+    .player-card:hover {
+      border-color: rgba(200,170,110,.5);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(200,170,110,.15);
+    }
+    .avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      border: 2px solid #2a3148; object-fit: cover; background: #1c2338;
+    }
+    .avatar-lg {
+      width: 96px; height: 96px; border-radius: 50%;
+      object-fit: cover; background: #1c2338;
+      border: 3px solid #2a3148;
+    }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 4px;
+      font-size: 11px; font-weight: 700;
+    }
+    .pos-1 { background: rgba(194,60,42,.2);   color: #e85a45; }
+    .pos-2 { background: rgba(240,212,134,.2); color: #f0d486; }
+    .pos-3 { background: rgba(146,166,41,.2);  color: #b5cf3b; }
+    .pos-4 { background: rgba(59,130,246,.2);  color: #60a5fa; }
+    .pos-5 { background: rgba(168,85,247,.2);  color: #c084fc; }
+
+    /* ====== TOP 3 领奖台 ====== */
+    .podium-card {
+      position: relative; overflow: hidden;
+      transition: all .25s cubic-bezier(.2,.8,.2,1);
+      border-width: 2px;
+    }
+    .podium-card:hover { transform: translateY(-4px) scale(1.02); }
+    .podium-1 {
+      border-color: #f0d486;
+      background:
+        linear-gradient(135deg, rgba(240,212,134,.12), transparent 60%),
+        linear-gradient(180deg, rgba(28,35,56,.92), rgba(20,26,42,.92));
+      box-shadow:
+        0 0 30px rgba(240,212,134,.35),
+        inset 0 0 30px rgba(240,212,134,.06);
+    }
+    .podium-2 {
+      border-color: #cbd5e1;
+      background:
+        linear-gradient(135deg, rgba(203,213,225,.10), transparent 60%),
+        linear-gradient(180deg, rgba(28,35,56,.92), rgba(20,26,42,.92));
+      box-shadow:
+        0 0 22px rgba(203,213,225,.25),
+        inset 0 0 25px rgba(203,213,225,.04);
+    }
+    .podium-3 {
+      border-color: #cd7f32;
+      background:
+        linear-gradient(135deg, rgba(205,127,50,.12), transparent 60%),
+        linear-gradient(180deg, rgba(28,35,56,.92), rgba(20,26,42,.92));
+      box-shadow:
+        0 0 22px rgba(205,127,50,.3),
+        inset 0 0 25px rgba(205,127,50,.05);
+    }
+    .podium-1 .podium-score { color: #f0d486; text-shadow: 0 0 20px rgba(240,212,134,.6); }
+    .podium-2 .podium-score { color: #cbd5e1; text-shadow: 0 0 15px rgba(203,213,225,.45); }
+    .podium-3 .podium-score { color: #e89466; text-shadow: 0 0 15px rgba(205,127,50,.5); }
+    .podium-1 .podium-avatar { border-color: #f0d486; }
+    .podium-2 .podium-avatar { border-color: #cbd5e1; }
+    .podium-3 .podium-avatar { border-color: #cd7f32; }
+
+    @keyframes shine {
+      0%   { background-position: -100% 0; }
+      100% { background-position:  200% 0; }
+    }
+    .podium-1::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: linear-gradient(105deg, transparent 35%, rgba(240,212,134,.12) 50%, transparent 65%);
+      background-size: 200% 100%;
+      animation: shine 5s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 30px rgba(240,212,134,.35), inset 0 0 30px rgba(240,212,134,.06); }
+      50%      { box-shadow: 0 0 45px rgba(240,212,134,.55), inset 0 0 30px rgba(240,212,134,.08); }
+    }
+    .podium-1 { animation: pulse-glow 3s ease-in-out infinite; }
+
+    .rank-huge {
+      font-size: 80px; font-weight: 900; line-height: 1;
+      position: absolute; right: -10px; bottom: -25px;
+      opacity: .08; user-select: none; pointer-events: none;
+    }
+    .rank-chip {
+      position: absolute; top: 8px; right: 8px;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #1c2338; border: 1px solid #2a3148;
+      font-size: 11px; font-weight: 700; color: #7a8499;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .medal {
+      position: absolute; top: -8px; right: -8px;
+      font-size: 56px; line-height: 1;
+      transform: rotate(15deg);
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,.4));
+    }
+  </style>
+</head>
+<body class="antialiased">
+
+{% include "_nav.html" %}
+
+<div x-data="home()" x-init="init()" class="max-w-[1400px] mx-auto px-4 py-6">
+
+  <!-- HERO BANNER -->
+  <header class="panel p-8 mb-6 relative overflow-hidden">
+    <div class="absolute -right-12 -top-12 w-64 h-64 rounded-full opacity-10"
+         style="background: radial-gradient(circle, #c8aa6e, transparent 70%);"></div>
+    <div class="relative flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <span class="text-6xl drop-shadow-[0_0_20px_rgba(200,170,110,0.6)]">🏆</span>
+        <div>
+          <h1 class="text-5xl md:text-6xl font-black gold-text leading-none"
+              style="letter-spacing: 0.12em; text-shadow: 0 0 40px rgba(200,170,110,0.35);">
+            江雪杯
+          </h1>
+          <div class="text-[11px] text-muted mt-2 flex items-center gap-2 tracking-[0.3em] italic">
+            <span class="w-10 h-px bg-gradient-to-r from-transparent to-gold/50"></span>
+            <span class="text-gold/80">⚔ 一个和谐友爱的 Dota2 社区 ⚔</span>
+            <span class="w-10 h-px bg-gradient-to-l from-transparent to-gold/50"></span>
+          </div>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-3" x-show="stats">
+        <div class="bg-panel2 px-4 py-2 rounded text-center">
+          <div class="text-xs text-muted">对局总数</div>
+          <div class="text-2xl font-black gold-text" x-text="stats?.summary?.total_matches"></div>
+        </div>
+        <div class="bg-panel2 px-4 py-2 rounded text-center">
+          <div class="text-xs text-muted">活跃选手</div>
+          <div class="text-2xl font-black gold-text" x-text="stats?.summary?.active_players"></div>
+        </div>
+        <div class="bg-panel2 px-4 py-2 rounded text-center">
+          <div class="text-xs text-muted">登场英雄</div>
+          <div class="text-2xl font-black gold-text" x-text="stats?.summary?.heroes_played"></div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div x-show="!stats" class="text-center py-12 text-muted">数据加载中…</div>
+
+  <!-- ============== TOP 3 领奖台 ============== -->
+  <section x-show="topThree.length > 0" class="mb-8">
+    <h2 class="font-bold gold-text text-lg mb-1 flex items-center gap-2">
+      <span class="text-2xl">🏆</span> 实力榜 TOP 3
+      <span class="text-[10px] px-2 py-0.5 rounded-full bg-gold/20 text-goldhi border border-gold/40 font-bold tracking-widest align-middle">总榜</span>
+      <span class="text-xs text-muted font-normal italic ml-2">全部对局累计 · 江雪杯当前最强三人</span>
+    </h2>
+    <p class="text-[11px] text-muted mb-4 ml-9 tracking-widest">◇  ◆  ◇  ◆  ◇  ◆  ◇</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:items-end">
+      <template x-for="p in topThree" :key="p.account_id">
+        <a :href="`/player/${p.account_id}`"
+           class="podium-card panel p-5 block"
+           :class="[
+             `podium-${p._rank}`,
+             p._rank === 1 ? 'md:order-2 md:-translate-y-4 md:scale-105 md:p-6' : '',
+             p._rank === 2 ? 'md:order-1 md:mt-10' : '',
+             p._rank === 3 ? 'md:order-3 md:mt-16' : '',
+           ]">
+          <div class="medal" x-text="['👑','🥈','🥉'][p._rank-1]"></div>
+          <div class="rank-huge gold-text" x-text="p._rank"></div>
+
+          <div class="relative text-center mb-3">
+            <div class="text-[10px] tracking-[0.3em] opacity-60 mb-2"
+                 x-text="['冠军 CHAMPION','亚军 RUNNER-UP','季军 BRONZE'][p._rank-1]"></div>
+            <img class="avatar-lg podium-avatar mx-auto mb-2"
+                 :src="p.profile?.avatar_url || '/static/default-avatar.svg'"
+                 onerror="this.src='/static/default-avatar.svg'"/>
+            <div class="font-black text-lg truncate" x-text="p.profile?.display_name || p.name"></div>
+            <div class="flex items-center justify-center gap-1 flex-wrap mt-1">
+              <template x-for="pos in (p.profile?.positions || [])" :key="pos">
+                <span class="badge" :class="`pos-${pos}`" x-text="positionLabel(pos)"></span>
+              </template>
+            </div>
+            <div class="text-[11px] text-muted italic truncate mt-1 px-2"
+                 x-text="p.profile?.signature || '这家伙很懒，啥也没写'"></div>
+          </div>
+
+          <div class="relative text-center py-2 mb-3 border-y border-border/50">
+            <div class="podium-score text-5xl font-black" x-text="p.skill_score"></div>
+            <div class="text-[10px] text-muted tracking-[0.2em] uppercase mt-0.5">Skill Score</div>
+          </div>
+
+          <div class="relative grid grid-cols-3 gap-2 text-xs mb-3">
+            <div class="bg-panel2/60 rounded p-1.5 text-center">
+              <div class="font-bold" x-text="p.matches"></div>
+              <div class="text-[10px] text-muted">场</div>
+            </div>
+            <div class="bg-panel2/60 rounded p-1.5 text-center">
+              <div class="font-bold" :class="p.winrate >= 55 ? 'text-radianthi' : p.winrate < 45 ? 'text-direhi' : ''"
+                   x-text="p.winrate + '%'"></div>
+              <div class="text-[10px] text-muted">胜率</div>
+            </div>
+            <div class="bg-panel2/60 rounded p-1.5 text-center">
+              <div class="font-bold gold-text" x-text="p.kda"></div>
+              <div class="text-[10px] text-muted">KDA</div>
+            </div>
+          </div>
+
+          <div class="relative flex items-center justify-center gap-1.5">
+            <template x-for="h in (p.top_heroes || []).slice(0, 5)" :key="h.hero_id">
+              <img class="hero-icon-md" :src="h.icon"
+                   :title="`${h.name}  ${h.picks}场 / 胜${h.wins}`"/>
+            </template>
+          </div>
+
+          <template x-if="p.profile?.custom_tags?.length">
+            <div class="relative flex flex-wrap gap-1 justify-center mt-3 pt-3 border-t border-border/50">
+              <template x-for="t in p.profile.custom_tags" :key="t">
+                <span class="text-[10px] px-2 py-0.5 bg-gold/20 text-goldhi rounded-full" x-text="t"></span>
+              </template>
+            </div>
+          </template>
+        </a>
+      </template>
+    </div>
+  </section>
+
+  <!-- ============== 近一周 天榜 / 地榜 ============== -->
+  <section x-show="skillLeaderboard.top.length > 0" class="mb-8">
+    <h2 class="font-bold text-lg mb-1 flex items-center gap-2 flex-wrap">
+      <span class="text-2xl">📅</span>
+      <span class="bg-gradient-to-r from-radianthi via-gold to-direhi bg-clip-text text-transparent">本周风云榜</span>
+      <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-direhi/20 text-direhi border border-direhi/60 font-black tracking-[0.2em] align-middle animate-pulse">周榜</span>
+      <span class="text-xs text-muted font-normal italic ml-1">仅看近 7 天战绩 · 一周一洗牌，谁也别想躺</span>
+    </h2>
+    <p class="text-[11px] text-muted mb-4 ml-9 tracking-widest">◇  ◆  ◇  ◆  ◇  ◆  ◇</p>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="panel p-5">
+      <h2 class="font-bold text-radianthi mb-1 flex items-center gap-2">
+        <span class="w-1 h-4 bg-radiant rounded"></span> 🌟 天榜
+      </h2>
+      <p class="text-xs text-muted mb-3 ml-3">近一周综合实力 Top 5 · 至少 5 场</p>
+      <div class="space-y-2">
+        <template x-for="(p, idx) in skillLeaderboard.top" :key="'top-' + p.account_id">
+          <a :href="`/player/${p.account_id}`"
+             class="flex items-center gap-3 bg-panel2 p-3 rounded hover:bg-panel border-l-2 border-radiant/40 hover:border-radianthi transition">
+            <div class="text-2xl font-black w-8 text-center shrink-0"
+                 :class="idx === 0 ? 'text-goldhi' : idx === 1 ? 'text-gold/90' : idx === 2 ? 'text-gold/70' : 'text-muted'"
+                 x-text="idx + 1"></div>
+            <div class="flex-1 min-w-0">
+              <div class="font-bold truncate" x-text="p.profile?.display_name || p.name"></div>
+              <div class="text-xs text-radianthi italic truncate" x-text="p.reason"></div>
+              <div class="text-[11px] text-muted mt-0.5">
+                <span x-text="p.matches"></span> 场 ·
+                <span :class="p.winrate >= 55 ? 'text-radianthi' : p.winrate < 45 ? 'text-direhi' : 'text-muted'"
+                      x-text="p.winrate + '%'"></span>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="text-xl font-black text-radianthi whitespace-nowrap">
+                <span x-text="p.skill_score"></span>
+              </div>
+              <div class="text-[10px] text-muted">周实力分</div>
+            </div>
+          </a>
+        </template>
+      </div>
+    </div>
+
+    <div class="panel p-5">
+      <h2 class="font-bold text-direhi mb-1 flex items-center gap-2">
+        <span class="w-1 h-4 bg-dire rounded"></span> 🥄 地榜
+      </h2>
+      <p class="text-xs text-muted mb-3 ml-3">近一周综合实力倒数 5 · 至少 5 场</p>
+      <div class="space-y-2">
+        <template x-for="(p, idx) in skillLeaderboard.bottom" :key="'bot-' + p.account_id">
+          <a :href="`/player/${p.account_id}`"
+             class="flex items-center gap-3 bg-panel2 p-3 rounded hover:bg-panel border-l-2 border-dire/40 hover:border-direhi transition">
+            <div class="text-2xl font-black w-8 text-center text-muted shrink-0" x-text="idx + 1"></div>
+            <div class="flex-1 min-w-0">
+              <div class="font-bold truncate" x-text="p.profile?.display_name || p.name"></div>
+              <div class="text-xs text-direhi italic truncate" x-text="p.reason"></div>
+              <div class="text-[11px] text-muted mt-0.5">
+                <span x-text="p.matches"></span> 场 ·
+                <span :class="p.winrate >= 55 ? 'text-radianthi' : p.winrate < 45 ? 'text-direhi' : 'text-muted'"
+                      x-text="p.winrate + '%'"></span>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="text-xl font-black text-direhi whitespace-nowrap">
+                <span x-text="p.skill_score"></span>
+              </div>
+              <div class="text-[10px] text-muted">周实力分</div>
+            </div>
+          </a>
+        </template>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <!-- ============== 全部选手 ============== -->
+  <section id="all-players" x-show="restPlayers.length > 0">
+    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+      <h2 class="font-bold text-gold flex items-center gap-2">
+        <span class="w-1 h-4 bg-gold rounded"></span>
+        <span>🎮 全部选手</span>
+        <span class="text-xs text-muted font-normal" x-text="`(${restPlayers.length})`"></span>
+        <span class="text-[10px] text-muted font-normal italic">· 至少 15 场参评</span>
+      </h2>
+      <input type="text" x-model="search" @input="playerPage = 1" placeholder="搜玩家…"
+             class="bg-bg border border-border rounded px-3 py-1.5 text-sm focus:border-gold outline-none w-48"/>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+      <template x-for="p in pagedRestPlayers" :key="p.account_id">
+        <a :href="`/player/${p.account_id}`"
+           class="player-card panel p-4 block relative">
+          <div class="rank-chip" x-text="p._rank"></div>
+
+          <div class="flex items-center gap-3 mb-3">
+            <img class="avatar" :src="p.profile?.avatar_url || '/static/default-avatar.svg'" :alt="p.name"
+                 onerror="this.src='/static/default-avatar.svg'" />
+            <div class="flex-1 min-w-0 pr-7">
+              <div class="font-bold truncate" x-text="p.profile?.display_name || p.name"></div>
+              <div class="flex items-center gap-1 flex-wrap mt-0.5">
+                <template x-for="pos in (p.profile?.positions || [])" :key="pos">
+                  <span class="badge" :class="`pos-${pos}`" x-text="positionLabel(pos)"></span>
+                </template>
+              </div>
+              <div class="text-[11px] text-muted truncate italic mt-1"
+                   x-text="p.profile?.signature || '这家伙很懒，啥也没写'"></div>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-xs mb-3">
+            <div class="bg-panel2 rounded p-1.5 text-center">
+              <div class="font-bold" x-text="p.matches"></div>
+              <div class="text-[10px] text-muted">场</div>
+            </div>
+            <div class="bg-panel2 rounded p-1.5 text-center">
+              <div class="font-bold" :class="p.winrate >= 55 ? 'text-radianthi' : p.winrate < 45 ? 'text-direhi' : ''"
+                   x-text="p.winrate + '%'"></div>
+              <div class="text-[10px] text-muted">胜率</div>
+            </div>
+            <div class="bg-panel2 rounded p-1.5 text-center">
+              <div class="font-bold gold-text" x-text="p.skill_score ?? '—'"></div>
+              <div class="text-[10px] text-muted">实力分</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] text-muted">常用:</span>
+            <template x-for="h in (p.top_heroes || []).slice(0, 4)" :key="h.hero_id">
+              <img class="hero-icon-sm" :src="h.icon" :alt="h.name"
+                   :title="`${h.name}  ${h.picks}场 / 胜${h.wins}`"/>
+            </template>
+          </div>
+          <template x-if="p.profile?.custom_tags?.length">
+            <div class="flex flex-wrap gap-1 mt-2 pt-2 border-t border-border">
+              <template x-for="t in p.profile.custom_tags" :key="t">
+                <span class="text-[10px] px-1.5 py-0.5 bg-gold/15 text-goldhi rounded" x-text="t"></span>
+              </template>
+            </div>
+          </template>
+        </a>
+      </template>
+    </div>
+
+    <!-- 分页 -->
+    <div class="flex items-center justify-between mt-5 px-1 text-xs text-muted" x-show="restPlayers.length > pageSize">
+      <div>
+        共 <span class="text-white font-bold" x-text="restPlayers.length"></span> 名 ·
+        第 <span x-text="(playerPage-1)*pageSize+1"></span>-<span x-text="Math.min(playerPage*pageSize, restPlayers.length)"></span> 名
+      </div>
+      <div class="flex items-center gap-1">
+        <button @click="goPage(-1)" :disabled="playerPage <= 1"
+                class="px-3 py-1 rounded border border-border hover:border-gold/40 disabled:opacity-30 disabled:cursor-not-allowed">‹ 上一页</button>
+        <span class="px-3">第 <span class="text-gold font-bold" x-text="playerPage"></span> / <span x-text="restTotalPages"></span> 页</span>
+        <button @click="goPage(1)" :disabled="playerPage >= restTotalPages"
+                class="px-3 py-1 rounded border border-border hover:border-gold/40 disabled:opacity-30 disabled:cursor-not-allowed">下一页 ›</button>
+      </div>
+    </div>
+  </section>
+
+  <div x-show="stats && topThree.length === 0 && restPlayers.length === 0"
+       class="panel p-12 text-center">
+    <div class="text-6xl mb-3">🕒</div>
+    <h3 class="text-lg font-bold text-gold mb-2">还没有符合条件的选手</h3>
+    <p class="text-sm text-muted">每个选手至少打满 15 场才会出现在卡片榜单里</p>
+  </div>
+
+  <footer class="text-center text-xs text-muted mt-8 py-4">
+    数据来源：Steam Web API · OpenDota
+  </footer>
+</div>
+
+<script>
+function home() {
+  return {
+    stats: null,
+    profiles: {},
+    search: '',
+    playerPage: 1,
+    pageSize: 20,
+
+    async init() {
+      const [statsRes, profilesRes] = await Promise.all([
+        fetch('/api/stats').then(r => r.json()),
+        fetch('/api/profiles').then(r => r.json()),
+      ]);
+      this.stats = statsRes.data;
+      this.profiles = profilesRes || {};
+      if (this.stats) {
+        this._enrichPlayers();
+        this._computeRankChanges();
+      }
+    },
+
+    _perMatchScore(p) {
+      return (p.kills * 1.7 + p.assists * 2.0 - p.deaths * 0.5) * 80
+           + (p.hero_damage   || 0) / 100
+           + (p.tower_damage  || 0) / 45
+           + (p.hero_healing  || 0) / 80
+           + (p.gpm           || 0) * 1.2
+           + (p.xpm           || 0) * 0.8
+           + (p.last_hits     || 0) * 0.2
+           + (p.denies        || 0) * 2.5
+           + (p.net_worth     || 0) / 900
+           + (p.level         || 0) * 2.8
+           + (p.win ? 100 : 0);
+    },
+
+    _enrichPlayers() {
+      const tot = {};
+      const wk = {};                                              // 近一周聚合
+      const weekCutoff = Math.floor(Date.now() / 1000) - 7 * 86400;
+      for (const m of this.stats.matches || []) {
+        const inWeek = (m.start_ts || 0) >= weekCutoff;
+        for (const p of m.players || []) {
+          if (!p.account_id) continue;
+          if (!tot[p.account_id]) tot[p.account_id] = { s:0, gpm:0, hd:0, td:0, heal:0, dn:0, nw:0, xpm:0, n:0 };
+          const t = tot[p.account_id];
+          const sc = this._perMatchScore(p);
+          t.s += sc;
+          t.gpm += p.gpm || 0;          t.xpm += p.xpm || 0;
+          t.hd  += p.hero_damage || 0;   t.td  += p.tower_damage || 0;
+          t.heal+= p.hero_healing || 0;  t.dn  += p.denies || 0;
+          t.nw  += p.net_worth || 0;
+          t.n++;
+          if (inWeek) {
+            if (!wk[p.account_id]) wk[p.account_id] = { s:0, k:0, d:0, a:0, gpm:0, hd:0, td:0, heal:0, dn:0, nw:0, wins:0, n:0 };
+            const w = wk[p.account_id];
+            w.s += sc;
+            w.k += p.kills || 0;          w.d += p.deaths || 0;     w.a += p.assists || 0;
+            w.gpm += p.gpm || 0;          w.hd += p.hero_damage || 0;  w.td += p.tower_damage || 0;
+            w.heal += p.hero_healing || 0; w.dn += p.denies || 0;   w.nw += p.net_worth || 0;
+            if (p.win) w.wins++;
+            w.n++;
+          }
+        }
+      }
+      for (const p of this.stats.players) {
+        const t = tot[p.account_id];
+        if (t && t.n) {
+          p.skill_score      = Math.round(t.s   / t.n);
+          p.avg_gpm          = Math.round(t.gpm / t.n);
+          p.avg_xpm          = Math.round(t.xpm / t.n);
+          p.avg_hero_damage  = Math.round(t.hd  / t.n);
+          p.avg_tower_damage = Math.round(t.td  / t.n);
+          p.avg_hero_healing = Math.round(t.heal/ t.n);
+          p.avg_denies       = Math.round(t.dn  / t.n * 10) / 10;
+          p.avg_net_worth    = Math.round(t.nw  / t.n);
+        } else {
+          p.skill_score = 0;
+        }
+        const w = wk[p.account_id];
+        if (w && w.n) {
+          p.week_matches         = w.n;
+          p.week_skill_score     = Math.round(w.s / w.n);
+          p.week_winrate         = Math.round(w.wins / w.n * 1000) / 10;
+          p.week_kda             = Math.round((w.k + w.a) / Math.max(1, w.d) * 100) / 100;
+          p.week_avg_kills       = Math.round(w.k / w.n * 10) / 10;
+          p.week_avg_deaths      = Math.round(w.d / w.n * 10) / 10;
+          p.week_avg_assists     = Math.round(w.a / w.n * 10) / 10;
+          p.week_avg_gpm         = Math.round(w.gpm / w.n);
+          p.week_avg_hero_damage = Math.round(w.hd / w.n);
+          p.week_avg_tower_damage= Math.round(w.td / w.n);
+          p.week_avg_hero_healing= Math.round(w.heal / w.n);
+          p.week_avg_denies      = Math.round(w.dn / w.n * 10) / 10;
+          p.week_avg_net_worth   = Math.round(w.nw / w.n);
+        } else {
+          p.week_matches = 0;
+          p.week_skill_score = undefined;
+        }
+        p.profile = this.profiles[p.account_id] || null;
+      }
+    },
+
+    _computeRankChanges() {
+      const STORAGE_KEY = 'dota-stats-snapshot-' + (this.stats.league_id || 0);
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const ranked = this.stats.players
+        .filter(p => p.matches >= 15 && p.skill_score)
+        .sort((a, b) => b.skill_score - a.skill_score);
+      const cur = {};
+      ranked.forEach((p, i) => { cur[p.account_id] = { rank: i+1, score: p.skill_score }; });
+
+      let snap;
+      try { snap = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+      catch (e) { snap = {}; }
+
+      if (snap.today_date && snap.today_date !== today) {
+        snap.yesterday_date = snap.today_date;
+        snap.yesterday_ranks = snap.today_ranks;
+      }
+      if (snap.today_date !== today) {
+        snap.today_date = today;
+        snap.today_ranks = cur;
+      }
+
+      const yest = snap.yesterday_ranks || {};
+      for (const p of this.stats.players) {
+        const c = cur[p.account_id], o = yest[p.account_id];
+        if (!c) { p.rank_change_label = null; }
+        else if (!o) { p.rank_change_label = '★NEW'; p.rank_change_color = 'text-gold'; }
+        else if (c.rank < o.rank) { p.rank_change_label = '↑' + (o.rank - c.rank); p.rank_change_color = 'text-radianthi'; }
+        else if (c.rank > o.rank) { p.rank_change_label = '↓' + (c.rank - o.rank); p.rank_change_color = 'text-direhi'; }
+        else { p.rank_change_label = '—'; p.rank_change_color = 'text-muted'; }
+      }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snap)); } catch (e) {}
+    },
+
+    _topQuips: [
+      { m: p => p.kda >= 8,                       t: p => `KDA ${p.kda}，这数据不送去打 TI 简直浪费` },
+      { m: p => p.kda >= 7,                       t: p => `KDA ${p.kda}，一打五对面加起来都打不过他` },
+      { m: p => p.kda >= 5,                       t: p => `KDA ${p.kda}，比对面活得还久的男人` },
+      { m: p => p.kda >= 4,                       t: p => `KDA ${p.kda}，稳如老狗，老婆看了都点赞` },
+      { m: p => p.avg_kills >= 16,                t: p => `场均 ${p.avg_kills} 杀，杀到对面集体卸载游戏` },
+      { m: p => p.avg_kills >= 14,                t: p => `场均 ${p.avg_kills} 杀，碰他的英雄都跟着遭殃` },
+      { m: p => p.avg_kills >= 11,                t: p => `场均 ${p.avg_kills} 杀，敌方看到 ID 直接禁` },
+      { m: p => p.winrate >= 80,                  t: p => `胜率 ${p.winrate}%，赢到对面开始怀疑人生` },
+      { m: p => p.winrate >= 70,                  t: p => `胜率 ${p.winrate}%，已被举报开挂 N 次` },
+      { m: p => p.winrate >= 60,                  t: p => `胜率 ${p.winrate}%，对面看 ID 就秒退` },
+      { m: p => p.avg_gpm >= 800,                 t: p => `GPM ${p.avg_gpm}，钱包比对面基地还鼓` },
+      { m: p => p.avg_gpm >= 750,                 t: p => `GPM ${p.avg_gpm}，钱多到不知往哪花` },
+      { m: p => p.avg_gpm >= 650,                 t: p => `GPM ${p.avg_gpm}，野怪都得排队送钱` },
+      { m: p => p.avg_net_worth >= 22000,         t: p => `净身价 ${(p.avg_net_worth/1000).toFixed(1)}k，全场最靓的富哥` },
+      { m: p => p.avg_assists >= 25,              t: p => `场均 ${p.avg_assists} 助攻，全队的奶妈兼保姆` },
+      { m: p => p.avg_assists >= 22,              t: p => `场均 ${p.avg_assists} 助攻，抬队友上分的真男人` },
+      { m: p => p.avg_assists >= 18,              t: p => `场均 ${p.avg_assists} 助攻，每次团战他都在场` },
+      { m: p => p.avg_hero_damage / 1000 >= 45,   t: p => `场均伤害 ${Math.round(p.avg_hero_damage/1000)}k，对面血条直接报废` },
+      { m: p => p.avg_hero_damage / 1000 >= 40,   t: p => `场均伤害 ${Math.round(p.avg_hero_damage/1000)}k，对面血条像被偷` },
+      { m: p => p.avg_hero_damage / 1000 >= 30,   t: p => `场均伤害 ${Math.round(p.avg_hero_damage/1000)}k，团战核弹本人` },
+      { m: p => p.avg_tower_damage >= 2200,       t: p => `推塔成瘾，对面塔看见他自己就倒了` },
+      { m: p => p.avg_tower_damage >= 1800,       t: p => `推塔成瘾，对面基地见到他打哆嗦` },
+      { m: p => p.avg_tower_damage >= 1200,       t: p => `推塔狂魔，看见水晶就两眼放光` },
+      { m: p => p.avg_hero_healing / 1000 >= 6,   t: p => `场均奶 ${Math.round(p.avg_hero_healing/1000)}k，队友的命都是他给的` },
+      { m: p => p.avg_hero_healing / 1000 >= 5,   t: p => `场均奶 ${Math.round(p.avg_hero_healing/1000)}k，行走的医务室` },
+      { m: p => p.avg_hero_healing / 1000 >= 3,   t: p => `场均奶 ${Math.round(p.avg_hero_healing/1000)}k，队友的精神支柱` },
+      { m: p => p.avg_denies >= 18,               t: p => `场均反补 ${p.avg_denies}，对面一滴经验都别想喝` },
+      { m: p => p.avg_deaths <= 3,                t: p => `场均死 ${p.avg_deaths} 次，敌方组团都抓不到他` },
+      { m: p => p.matches >= 25,                  t: p => `本周 ${p.matches} 场，肝到对面都认识他了` },
+      { m: p => true, t: p => `没他不能赢，他碰一下队伍就赢了` },
+      { m: p => true, t: p => `队伍 carry 担当，下一届职业赛见` },
+      { m: p => true, t: p => `MVP 永久 ID 持有者，奖杯都长灰了` },
+      { m: p => true, t: p => `队友最想抱的大腿，粗到抱不过来` },
+      { m: p => true, t: p => `综合压制全场，顺手碾压自己队友` },
+      { m: p => true, t: p => `战神附体，BP 阶段就赢了一半` },
+      { m: p => true, t: p => `对面 BP：要么 ban 他，要么 ban 他` },
+      { m: p => true, t: p => `队伍的精神图腾，拜一拜能上分` },
+      { m: p => true, t: p => `本周天选之子，躺赢都比别人帅` },
+      { m: p => true, t: p => `国服第一只是他的副业` },
+      { m: p => true, t: p => `据说他从不看小地图，因为地图得看他脸色` },
+      { m: p => true, t: p => `这把不用看了，他在己方就稳了` },
+      { m: p => true, t: p => `天梯客服遇到他都喊一声大哥` },
+      { m: p => true, t: p => `对面全队的童年阴影本影` },
+      { m: p => true, t: p => `打钱带线收割，一个人活成一支队伍` },
+      { m: p => true, t: p => `战绩截图被对面打印出来贴墙上当反面教材` },
+      { m: p => true, t: p => `开黑必抢、落单必躲的男人` },
+    ],
+
+    _botQuips: [
+      { m: p => p.avg_deaths >= 16,               t: p => `场均死 ${p.avg_deaths} 次，泉水都嫌他来得太勤` },
+      { m: p => p.avg_deaths >= 14,               t: p => `场均死 ${p.avg_deaths} 次，AFK 都比他多活两分钟` },
+      { m: p => p.avg_deaths >= 11,               t: p => `场均死 ${p.avg_deaths} 次，对面给他立了座铜像` },
+      { m: p => p.kda <= 0.7,                     t: p => `KDA ${p.kda}，对面靠他喜提五杀超神` },
+      { m: p => p.kda <= 0.9,                     t: p => `KDA ${p.kda}，对面包了辆豪车上门答谢` },
+      { m: p => p.kda <= 1.3,                     t: p => `KDA ${p.kda}，把 dota 玩成了跑跑卡丁车` },
+      { m: p => p.winrate <= 20,                  t: p => `胜率 ${p.winrate}%，赢一把够上本地新闻头条` },
+      { m: p => p.winrate <= 30,                  t: p => `胜率 ${p.winrate}%，赛博天选倒霉蛋` },
+      { m: p => p.winrate <= 40,                  t: p => `胜率 ${p.winrate}%，队友最想 mute 的男人` },
+      { m: p => p.avg_kills <= 2,                 t: p => `场均 ${p.avg_kills} 杀，杀人对他来说是门玄学` },
+      { m: p => p.avg_kills <= 2.5,              t: p => `场均 ${p.avg_kills} 杀，见到敌人就往泉水跑` },
+      { m: p => p.avg_kills <= 4,                 t: p => `场均 ${p.avg_kills} 杀，对面英雄看到他都笑出声` },
+      { m: p => p.avg_gpm <= 280,                 t: p => `GPM ${p.avg_gpm}，穷到连真眼都买不起` },
+      { m: p => p.avg_gpm <= 320,                 t: p => `GPM ${p.avg_gpm}，对面眼里的免费提款机` },
+      { m: p => p.avg_gpm <= 400,                 t: p => `GPM ${p.avg_gpm}，野怪都嫌弃他补刀` },
+      { m: p => p.avg_assists <= 4,               t: p => `场均 ${p.avg_assists} 助攻，团战？那是什么` },
+      { m: p => p.avg_assists <= 5,               t: p => `场均 ${p.avg_assists} 助攻，团战开局就跑去打野` },
+      { m: p => p.avg_assists <= 8,               t: p => `场均 ${p.avg_assists} 助攻，团战时蹲在树林里观战` },
+      { m: p => p.avg_hero_damage / 1000 <= 8,    t: p => `场均伤害 ${Math.round(p.avg_hero_damage/1000)}k，平 A 都比他疼` },
+      { m: p => p.avg_hero_damage / 1000 <= 10,   t: p => `场均伤害 ${Math.round(p.avg_hero_damage/1000)}k，木桩都比他能打` },
+      { m: p => p.avg_hero_damage / 1000 <= 15,   t: p => `场均伤害 ${Math.round(p.avg_hero_damage/1000)}k，兵刃像在挠痒痒` },
+      { m: p => true, t: p => `常年活在大招冷却里的男人` },
+      { m: p => true, t: p => `队友的 MMR 终结者` },
+      { m: p => true, t: p => `代练接到他的单都吓得退款` },
+      { m: p => true, t: p => `对面教练含泪寄来感谢信` },
+      { m: p => true, t: p => `蹲泉水的次数比补的刀还多` },
+      { m: p => true, t: p => `队友最想 5 抢 1 的那一个` },
+      { m: p => true, t: p => `全方位拉胯，资深赛博公益志愿者` },
+      { m: p => true, t: p => `dota 玩家，CS 高手，走错了房间` },
+      { m: p => true, t: p => `每场比赛的最佳卧底，演技封神` },
+      { m: p => true, t: p => `这把肯定是号被盗了，绝对不是本人` },
+      { m: p => true, t: p => `对面经常误以为他是自己人` },
+      { m: p => true, t: p => `开局送一血，结束送终结，全程不空闲` },
+      { m: p => true, t: p => `队友最大的对手就是他自己` },
+      { m: p => true, t: p => `本周最佳慈善家，逢敌必送温暖` },
+      { m: p => true, t: p => `对面靠他的人头一周连升三段` },
+      { m: p => true, t: p => `他不是菜，他只是在给对面送福利` },
+      { m: p => true, t: p => `举报系统看到他都懒得受理了` },
+      { m: p => true, t: p => `泉水水疗中心 VIP 年卡持有者` },
+      { m: p => true, t: p => `打野十分钟，团战零参与` },
+      { m: p => true, t: p => `队友建议：挂机吧，至少不送人头` },
+      { m: p => true, t: p => `GG 永远打得比谁都快的男人` },
+    ],
+
+    _pickQuip(p, pool, used, fallback) {
+      for (let i = 0; i < pool.length; i++) {
+        if (used.has(i)) continue;
+        if (pool[i].m(p)) { used.add(i); return pool[i].t(p); }
+      }
+      return fallback;
+    },
+
+    get skillLeaderboard() {
+      if (!this.stats?.players?.length) return { top: [], bottom: [] };
+      const MIN_WEEK_MATCHES = 5;
+      // 近一周榜：用 week_* 字段，并把它们映射到段子/模板读取的字段名上，
+      // 这样展示的场次/胜率/实力分以及段子选取全部基于近一周数据。
+      const arr = this.stats.players
+        .filter(p => p.week_matches >= MIN_WEEK_MATCHES && p.week_skill_score !== undefined)
+        .map(p => ({
+          ...p,
+          matches:          p.week_matches,
+          winrate:          p.week_winrate,
+          skill_score:      p.week_skill_score,
+          kda:              p.week_kda,
+          avg_kills:        p.week_avg_kills,
+          avg_deaths:       p.week_avg_deaths,
+          avg_assists:      p.week_avg_assists,
+          avg_gpm:          p.week_avg_gpm,
+          avg_hero_damage:  p.week_avg_hero_damage,
+          avg_tower_damage: p.week_avg_tower_damage,
+          avg_hero_healing: p.week_avg_hero_healing,
+          avg_denies:       p.week_avg_denies,
+          avg_net_worth:    p.week_avg_net_worth,
+        }))
+        .sort((a, b) => b.skill_score - a.skill_score);
+      const usedTop = new Set(), usedBot = new Set();
+      const top     = arr.slice(0, 5).map(p => ({ ...p, reason: this._pickQuip(p, this._topQuips, usedTop, '综合压制全场') }));
+      // 地榜排除已进天榜的人（不足 10 人时避免同一人两边都出现）
+      const topIds  = new Set(top.map(p => p.account_id));
+      const bottom  = arr.filter(p => !topIds.has(p.account_id)).slice(-5).reverse()
+        .map(p => ({ ...p, reason: this._pickQuip(p, this._botQuips, usedBot, '全方位拉胯') }));
+      return { top, bottom };
+    },
+
+    get _ranked() {
+      if (!this.stats) return [];
+      return this.stats.players
+        .filter(p => p.matches >= 15)
+        .sort((a, b) => (b.skill_score || 0) - (a.skill_score || 0))
+        .map((p, i) => ({ ...p, _rank: i + 1 }));
+    },
+
+    get topThree() {
+      return this._ranked.slice(0, 3);
+    },
+
+    get restPlayers() {
+      const q = this.search.trim().toLowerCase();
+      let rows = this._ranked.slice(3);
+      if (q) {
+        rows = rows.filter(p =>
+          (p.name || '').toLowerCase().includes(q) ||
+          (p.profile?.display_name || '').toLowerCase().includes(q) ||
+          String(p.account_id).includes(q)
+        );
+      }
+      return rows;
+    },
+
+    get pagedRestPlayers() {
+      const start = (this.playerPage - 1) * this.pageSize;
+      return this.restPlayers.slice(start, start + this.pageSize);
+    },
+
+    get restTotalPages() {
+      return Math.max(1, Math.ceil(this.restPlayers.length / this.pageSize));
+    },
+
+    goPage(delta) {
+      const next = Math.max(1, Math.min(this.restTotalPages, this.playerPage + delta));
+      this.playerPage = next;
+      // 翻页时滚到这一区的顶端，让用户看到第一行新内容
+      this.$nextTick(() => {
+        document.getElementById('all-players')?.scrollIntoView({behavior:'smooth', block:'start'});
+      });
+    },
+
+    positionLabel(pos) {
+      return ['', '1号位', '2号位', '3号位', '4号位', '5号位'][pos] || '';
+    },
+  };
+}
+</script>
+
+</body></html>

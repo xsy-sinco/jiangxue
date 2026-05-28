@@ -1,0 +1,15 @@
+# matches.txt —— 手动指定要统计的 match_id（B 路兜底）
+#
+# 每行一个 match_id；# 起头的行视为注释；空行忽略。
+# 把本文件复制为 matches.txt 后填入即可，程序会与"玩家反查"得到的 ID 合并去重。
+#
+# 用途：
+#   - excluded 联赛里某场比赛队员都不在 team_members 列表里时手动补
+#   - 临时想加几场不属于该联赛的友谊赛进统计
+#
+# match_id 从哪拿：
+#   - Dota2 客户端 → 最近比赛 → 点开某场 → 比赛 ID
+#   - 或访问 https://www.opendota.com/players/<account_id>/matches
+
+# 7891234567
+# 7891234999

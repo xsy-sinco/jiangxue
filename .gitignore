@@ -1,0 +1,35 @@
+# 含 steam_api_key — 严禁入库
+config.json
+matches.txt
+.env
+sync.config.json
+
+# 缓存与产物
+data/
+output/
+*.log
+fetch.log
+serve.log
+
+# 社区运行时数据：SQLite（含密码 hash）+ 用户上传头像，严禁入库
+community/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store

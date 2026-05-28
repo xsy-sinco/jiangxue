@@ -1,0 +1,16 @@
+<nav class="bg-panel border-b border-border sticky top-0 z-30 backdrop-blur-sm">
+  <div class="max-w-[1400px] mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+    <a href="/" class="flex items-center gap-2 group">
+      <span class="text-2xl group-hover:scale-110 transition">🏆</span>
+      <span class="font-black gold-text text-lg tracking-wider">江雪杯</span>
+    </a>
+    <div class="flex items-center gap-1 text-sm">
+      <a href="/"      class="px-3 py-1.5 rounded transition hover:bg-panel2 {{ 'gold-text font-bold' if active=='home'  else 'text-muted hover:text-white' }}">首页</a>
+      <a href="/stats" class="px-3 py-1.5 rounded transition hover:bg-panel2 {{ 'gold-text font-bold' if active=='stats' else 'text-muted hover:text-white' }}">战绩</a>
+      <a href="/events" class="px-3 py-1.5 rounded transition hover:bg-panel2 {{ 'gold-text font-bold' if active=='events' else 'text-muted hover:text-white' }}">歌友会</a>
+      <span class="px-3 py-1.5 text-muted opacity-40 cursor-not-allowed" title="开发中">赛事</span>
+      <div class="w-px h-6 bg-border mx-1"></div>
+      <a href="/me" class="px-3 py-1.5 rounded bg-gold/20 text-goldhi hover:bg-gold/30 font-bold transition">👤 我的</a>
+    </div>
+  </div>
+</nav>

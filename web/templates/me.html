@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>我的资料 · 江雪杯</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0e1a'/><text x='50' y='72' font-size='70' text-anchor='middle' fill='%23c8aa6e'>%F0%9F%8F%86</text></svg>" />
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: {
+      bg: '#0a0e1a', panel: '#141a2a', panel2: '#1c2338', border: '#2a3148',
+      gold: '#c8aa6e', goldhi: '#f0d486', radiant: '#92a629', radianthi: '#b5cf3b',
+      dire: '#c23c2a', direhi: '#e85a45', muted: '#7a8499',
+    }}}};
+  </script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+  <style>
+    body {
+      background: linear-gradient(180deg, #0a0e1a, #06090f);
+      color: #e8eaed; min-height: 100vh;
+      font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    .panel {
+      background: linear-gradient(180deg, rgba(28,35,56,.85), rgba(20,26,42,.85));
+      border: 1px solid #2a3148; border-radius: 12px;
+    }
+    .gold-text {
+      background: linear-gradient(180deg, #f0d486 0%, #c8aa6e 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    input, textarea, select {
+      background: #0a0e1a; border: 1px solid #2a3148; border-radius: 6px;
+      padding: 8px 12px; color: #e8eaed; font-size: 14px; width: 100%;
+    }
+    input:focus, textarea:focus, select:focus { border-color: #c8aa6e; outline: none; }
+    label { display: block; font-size: 13px; color: #7a8499; margin-bottom: 4px; }
+    .avatar-big {
+      width: 120px; height: 120px; border-radius: 50%;
+      border: 3px solid #2a3148; object-fit: cover; background: #1c2338;
+    }
+    .btn-primary {
+      padding: 10px 18px; background: #c8aa6e; color: #0a0e1a;
+      font-weight: 700; border-radius: 6px; transition: all .15s;
+      width: 100%; border: 0; cursor: pointer;
+    }
+    .btn-primary:hover:not(:disabled) { background: #f0d486; }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .tab {
+      flex: 1; padding: 10px; text-align: center; cursor: pointer;
+      border-bottom: 2px solid transparent; color: #7a8499; font-weight: 700;
+    }
+    .tab.active { color: #f0d486; border-bottom-color: #c8aa6e; }
+  </style>
+</head>
+<body class="antialiased">
+
+{% include "_nav.html" %}
+
+<div x-data="me()" x-init="init()" class="max-w-3xl mx-auto px-4 py-6">
+
+  <div x-show="loading" class="text-center py-12 text-muted">加载中…</div>
+
+  <!-- ============== 未登录：登录 / 注册 ============== -->
+  <div x-show="!loading && !user.logged_in" class="panel p-6">
+    <h1 class="text-2xl font-black gold-text mb-1">欢迎来到江雪杯</h1>
+    <p class="text-sm text-muted mb-5">登录后可上传头像 · 写个人简述 · 设置常用位置</p>
+
+    <div class="flex border-b border-border mb-5">
+      <div class="tab" :class="mode==='login' && 'active'" @click="mode='login'; err=''">登录</div>
+      <div class="tab" :class="mode==='register' && 'active'" @click="mode='register'; err=''">注册</div>
+    </div>
+
+    <!-- 登录表单 -->
+    <div x-show="mode==='login'" class="space-y-3">
+      <div>
+        <label>用户名</label>
+        <input type="text" x-model="login.username" autocomplete="username"/>
+      </div>
+      <div>
+        <label>密码</label>
+        <input type="password" x-model="login.password" @keydown.enter="doLogin()" autocomplete="current-password"/>
+      </div>
+      <button @click="doLogin()" :disabled="busy" class="btn-primary">
+        <span x-text="busy ? '登录中…' : '登录'"></span>
+      </button>
+    </div>
+
+    <!-- 注册表单 -->
+    <div x-show="mode==='register'" class="space-y-3">
+      <div>
+        <label>用户名（2-20 字符，字母数字下划线中文）</label>
+        <input type="text" x-model="reg.username" maxlength="20"/>
+      </div>
+      <div>
+        <label>密码（≥6 位）</label>
+        <input type="password" x-model="reg.password"/>
+      </div>
+      <div>
+        <label>再输一次密码</label>
+        <input type="password" x-model="reg.password2"/>
+      </div>
+      <div>
+        <label>选择你的玩家身份 <span class="text-muted">（从打过比赛的玩家里选）</span></label>
+        <input type="text" x-model="reg.search" placeholder="输名字或 account_id 筛选…"
+               class="mb-2"/>
+        <select x-model.number="reg.account_id" size="6" class="cursor-pointer">
+          <template x-for="p in regCandidates" :key="p.account_id">
+            <option :value="p.account_id"
+                    x-text="`${p.name} · ${p.matches} 场 · ${p.account_id}` + (p.registered ? '  [已被注册]' : '')"
+                    :disabled="p.registered"></option>
+          </template>
+        </select>
+        <p class="text-[10px] text-muted mt-1">如果列表里没有你，说明你还没打过江雪杯的比赛</p>
+      </div>
+      <button @click="doRegister()" :disabled="busy" class="btn-primary">
+        <span x-text="busy ? '注册中…' : '注册并登录'"></span>
+      </button>
+    </div>
+
+    <p x-show="err" class="text-direhi text-sm mt-4" x-text="err"></p>
+  </div>
+
+  <!-- ============== 已登录：资料编辑 ============== -->
+  <div x-show="!loading && user.logged_in" class="panel p-6">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h2 class="text-xl font-black gold-text" x-text="user.username"></h2>
+        <div class="text-xs text-muted">
+          关联玩家: <span x-text="myPlayer?.name || '(未在玩家库中找到)'"></span>
+          · <span class="font-mono" x-text="user.account_id"></span>
+        </div>
+      </div>
+      <button @click="doLogout()" class="text-xs text-muted hover:text-gold">退出登录</button>
+    </div>
+
+    <!-- 头像 -->
+    <div class="flex items-center gap-5 mb-5 pb-5 border-b border-border">
+      <img class="avatar-big" :src="form.avatar_url || '/static/default-avatar.svg'"
+           onerror="this.src='/static/default-avatar.svg'"/>
+      <div class="flex-1">
+        <label>头像</label>
+        <input type="file" accept="image/*" @change="uploadAvatar($event)"
+               class="text-xs file:bg-gold file:text-bg file:font-bold file:border-0 file:rounded file:px-3 file:py-1.5 file:mr-3 file:cursor-pointer"/>
+        <p class="text-[10px] text-muted mt-2">jpg/png/webp，≤5MB</p>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label>个性签名（一句话）</label>
+      <input type="text" x-model="form.signature" maxlength="100"
+             placeholder="比如：3 号位选手 / 永远在路上的辅助 ..."/>
+    </div>
+
+    <div class="mb-4">
+      <label>个人简述</label>
+      <textarea x-model="form.bio" rows="4" maxlength="1000"
+                placeholder="自我介绍：风格 / 拿手英雄 / 经典语录..."></textarea>
+    </div>
+
+    <div class="mb-4">
+      <label>常用位置（可多选）</label>
+      <div class="grid grid-cols-5 gap-2">
+        <template x-for="(label, idx) in ['1号位 大哥','2号位 中单','3号位 抗压路','4号位 游走','5号位 辅助']" :key="idx">
+          <label class="cursor-pointer">
+            <input type="checkbox" :value="idx+1" x-model.number="form.positions" class="peer hidden"/>
+            <div class="text-center py-2 rounded border border-border bg-bg
+                        peer-checked:bg-gold/20 peer-checked:border-gold peer-checked:text-goldhi
+                        hover:border-gold/50 transition">
+              <div class="text-lg font-black" x-text="idx+1"></div>
+              <div class="text-[10px] text-muted" x-text="label.split(' ')[1]"></div>
+            </div>
+          </label>
+        </template>
+      </div>
+    </div>
+
+    <div class="mb-5">
+      <label>自定义标签（逗号分隔，最多 10 个，每个 ≤20 字）</label>
+      <input type="text" x-model="tagsInput"
+             placeholder="例如：自闭中单, 抗压选手, 老 ck 队长"/>
+    </div>
+
+    <div class="flex items-center gap-3 pt-3 border-t border-border">
+      <button @click="save()" :disabled="saving" class="btn-primary" style="width: auto;">
+        <span x-text="saving ? '保存中…' : '保存资料'"></span>
+      </button>
+      <a href="/" class="text-sm text-muted hover:text-gold">返回首页</a>
+      <span x-show="saveMsg" class="text-sm ml-auto"
+            :class="saveMsg.startsWith('✓') ? 'text-radianthi' : 'text-direhi'"
+            x-text="saveMsg"></span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function me() {
+  return {
+    loading: true,
+    busy: false,
+    err: '',
+    mode: 'login',
+    user: { logged_in: false, account_id: null, username: null, profile: null },
+    login: { username: '', password: '' },
+    reg: { username: '', password: '', password2: '', account_id: null, search: '' },
+
+    myPlayer: null,
+    allPlayers: [],
+    profiles: {},
+
+    form: { avatar_url: null, signature: '', bio: '', positions: [] },
+    tagsInput: '',
+    saving: false,
+    saveMsg: '',
+
+    async init() {
+      const [meData, statsData, profilesData] = await Promise.all([
+        fetch('/api/me').then(r => r.json()),
+        fetch('/api/stats').then(r => r.json()).catch(() => ({})),
+        fetch('/api/profiles').then(r => r.json()).catch(() => ({})),
+      ]);
+      this.user = meData;
+      this.allPlayers = statsData?.data?.players || [];
+      this.profiles = profilesData || {};
+      if (meData.logged_in) {
+        this.myPlayer = this.allPlayers.find(p => p.account_id === meData.account_id);
+        if (meData.profile) {
+          this.form.avatar_url = meData.profile.avatar_url;
+          this.form.signature  = meData.profile.signature || '';
+          this.form.bio        = meData.profile.bio || '';
+          this.form.positions  = meData.profile.positions || [];
+          this.tagsInput       = (meData.profile.custom_tags || []).join(', ');
+        }
+      }
+      this.loading = false;
+    },
+
+    get regCandidates() {
+      const q = (this.reg.search || '').trim().toLowerCase();
+      let list = this.allPlayers.slice().sort((a, b) => b.matches - a.matches);
+      if (q) list = list.filter(p =>
+        (p.name || '').toLowerCase().includes(q) || String(p.account_id).includes(q));
+      return list.slice(0, 50).map(p => ({
+        ...p,
+        registered: !!this.profiles[p.account_id]?.username,
+      }));
+    },
+
+    async doLogin() {
+      if (this.busy) return;
+      this.busy = true; this.err = '';
+      try {
+        const r = await fetch('/api/login', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(this.login),
+        });
+        const j = await r.json();
+        if (j.ok) { window.location.reload(); }
+        else { this.err = j.error || '登录失败'; }
+      } catch (e) { this.err = '网络错误'; }
+      finally { this.busy = false; }
+    },
+
+    async doRegister() {
+      if (this.busy) return;
+      if (this.reg.password !== this.reg.password2) {
+        this.err = '两次密码不一致'; return;
+      }
+      this.busy = true; this.err = '';
+      try {
+        const r = await fetch('/api/register', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            username: this.reg.username, password: this.reg.password,
+            account_id: this.reg.account_id,
+          }),
+        });
+        const j = await r.json();
+        if (j.ok) { window.location.reload(); }
+        else { this.err = j.error || '注册失败'; }
+      } catch (e) { this.err = '网络错误'; }
+      finally { this.busy = false; }
+    },
+
+    async doLogout() {
+      await fetch('/api/logout', {method:'POST'});
+      window.location.reload();
+    },
+
+    async uploadAvatar(ev) {
+      const file = ev.target.files[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('avatar', file);
+      this.saveMsg = '上传中…';
+      try {
+        const r = await fetch('/api/me/avatar', {method:'POST', body:fd});
+        const j = await r.json();
+        if (j.ok) {
+          this.form.avatar_url = j.avatar_url + '?t=' + Date.now();
+          this.saveMsg = '✓ 头像已更新';
+        } else {
+          this.saveMsg = '✗ ' + (j.error || '上传失败');
+        }
+      } catch (e) { this.saveMsg = '✗ 网络错误'; }
+    },
+
+    async save() {
+      this.saving = true; this.saveMsg = '';
+      const tags = this.tagsInput.split(/[,，]/).map(s => s.trim()).filter(Boolean).slice(0, 10);
+      try {
+        const r = await fetch('/api/me/profile', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            signature: this.form.signature,
+            bio:       this.form.bio,
+            positions: this.form.positions,
+            custom_tags: tags,
+          }),
+        });
+        const j = await r.json();
+        this.saveMsg = j.ok ? '✓ 已保存' : ('✗ ' + (j.error || '保存失败'));
+      } catch (e) { this.saveMsg = '✗ 网络错误'; }
+      finally { this.saving = false; }
+    },
+  };
+}
+</script>
+
+</body></html>

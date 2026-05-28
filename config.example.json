@@ -1,0 +1,13 @@
+{
+    "league_id": 19479,
+    "steam_api_key": "",
+    "api_key": "",
+    "rate_limit_per_minute": 55,
+    "cache_dir": "data/matches",
+    "output_dir": "output",
+    "team_members": [],
+    "player_aliases": {
+        "123456789": "队长",
+        "987654321": "中单"
+    }
+}

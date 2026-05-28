@@ -1,0 +1,17 @@
+[Unit]
+Description=Dota2 Inhouse Stats Web
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/html/dota-inhouse-stats
+Environment=WSGI_AUTOINIT=1
+EnvironmentFile=-/var/www/html/dota-inhouse-stats/.env
+ExecStart=/var/www/html/dota-inhouse-stats/.venv/bin/gunicorn -w 1 --threads 4 -b 0.0.0.0:80 --timeout 120 --access-logfile - --error-logfile - web.app:app
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

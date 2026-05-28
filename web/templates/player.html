@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>玩家资料 · 江雪杯</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0e1a'/><text x='50' y='72' font-size='70' text-anchor='middle' fill='%23c8aa6e'>%F0%9F%8F%86</text></svg>" />
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: {
+      bg: '#0a0e1a', panel: '#141a2a', panel2: '#1c2338', border: '#2a3148',
+      gold: '#c8aa6e', goldhi: '#f0d486', radiant: '#92a629', radianthi: '#b5cf3b',
+      dire: '#c23c2a', direhi: '#e85a45', muted: '#7a8499',
+    }}}};
+  </script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+  <style>
+    body {
+      background:
+        radial-gradient(circle at 20% 0%, rgba(146,166,41,.08), transparent 40%),
+        radial-gradient(circle at 80% 100%, rgba(194,60,42,.08), transparent 40%),
+        linear-gradient(180deg, #0a0e1a, #06090f);
+      color: #e8eaed; min-height: 100vh;
+      font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    .panel {
+      background: linear-gradient(180deg, rgba(28,35,56,.85), rgba(20,26,42,.85));
+      border: 1px solid #2a3148; border-radius: 12px;
+    }
+    .gold-text {
+      background: linear-gradient(180deg, #f0d486 0%, #c8aa6e 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .avatar-xl {
+      width: 140px; height: 140px; border-radius: 50%;
+      object-fit: cover; background: #1c2338;
+      border: 4px solid #2a3148;
+      box-shadow: 0 0 30px rgba(200,170,110,.2);
+    }
+    .stat-card {
+      background: rgba(28,35,56,.6);
+      border: 1px solid #2a3148;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .badge {
+      display: inline-block; padding: 3px 10px; border-radius: 6px;
+      font-size: 12px; font-weight: 700;
+    }
+    .pos-1 { background: rgba(194,60,42,.2);   color: #e85a45; }
+    .pos-2 { background: rgba(240,212,134,.2); color: #f0d486; }
+    .pos-3 { background: rgba(146,166,41,.2);  color: #b5cf3b; }
+    .pos-4 { background: rgba(59,130,246,.2);  color: #60a5fa; }
+    .pos-5 { background: rgba(168,85,247,.2);  color: #c084fc; }
+    .hero-icon {
+      width: 40px; height: 40px; border-radius: 6px;
+      border: 1px solid #2a3148; object-fit: cover;
+      transition: transform .15s;
+    }
+    .hero-icon:hover { transform: scale(1.15); }
+    .glow-radiant { box-shadow: inset 4px 0 0 #92a629; }
+    .glow-dire    { box-shadow: inset 4px 0 0 #c23c2a; }
+    .badge-radiant { background: rgba(146,166,41,.18); color: #b5cf3b; border: 1px solid rgba(146,166,41,.3); }
+    .badge-dire    { background: rgba(194,60,42,.18); color: #e85a45; border: 1px solid rgba(194,60,42,.3); }
+    .border-radiant { border-color: #92a629; }
+    .border-dire    { border-color: #c23c2a; }
+  </style>
+</head>
+<body class="antialiased">
+
+{% include "_nav.html" %}
+
+<div x-data="playerPage({{ account_id }})" x-init="init()" class="max-w-5xl mx-auto px-4 py-6">
+
+  <div x-show="loading" class="text-center py-12 text-muted">加载中…</div>
+
+  <div x-show="!loading && !player" class="panel p-12 text-center">
+    <div class="text-6xl mb-3">🤷</div>
+    <h2 class="text-lg font-bold text-gold mb-2">找不到这位玩家</h2>
+    <p class="text-sm text-muted">account_id <span class="font-mono">{{ account_id }}</span> 还没打过江雪杯的比赛</p>
+    <a href="/" class="inline-block mt-4 px-4 py-2 bg-gold/20 text-goldhi rounded font-bold hover:bg-gold/30">返回首页</a>
+  </div>
+
+  <template x-if="!loading && player">
+    <div>
+      <!-- ===== 头部：头像 + 名字 + 标签 + 概览 ===== -->
+      <header class="panel p-6 mb-6">
+        <div class="flex flex-col md:flex-row gap-6 items-start">
+          <img class="avatar-xl shrink-0 mx-auto md:mx-0"
+               :src="profile?.avatar_url || '/static/default-avatar.svg'"
+               onerror="this.src='/static/default-avatar.svg'"/>
+          <div class="flex-1 min-w-0 w-full">
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <h1 class="text-3xl font-black gold-text" x-text="profile?.display_name || player.name"></h1>
+                <div class="text-xs text-muted font-mono mt-1">account_id · <span x-text="player.account_id"></span></div>
+              </div>
+              <div class="flex gap-2 text-xs">
+                <a :href="`https://www.opendota.com/players/${player.account_id}`" target="_blank"
+                   class="text-muted hover:text-gold">OpenDota ↗</a>
+                <a :href="`https://www.dotabuff.com/players/${player.account_id}`" target="_blank"
+                   class="text-muted hover:text-gold">Dotabuff ↗</a>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <template x-for="pos in (profile?.positions || [])" :key="pos">
+                <span class="badge" :class="`pos-${pos}`" x-text="positionLabel(pos)"></span>
+              </template>
+              <template x-for="t in (profile?.custom_tags || [])" :key="t">
+                <span class="badge bg-gold/20 text-goldhi" x-text="t"></span>
+              </template>
+            </div>
+            <p x-show="profile?.signature"
+               class="text-base italic text-gold/90 mt-3" x-text="`「${profile?.signature}」`"></p>
+          </div>
+        </div>
+
+        <!-- 个人简介 -->
+        <template x-if="profile?.bio">
+          <div class="mt-5 pt-5 border-t border-border">
+            <h3 class="text-xs text-muted uppercase tracking-wider mb-2">📝 个人简介</h3>
+            <p class="text-sm whitespace-pre-wrap" x-text="profile.bio"></p>
+          </div>
+        </template>
+      </header>
+
+      <!-- ===== 核心数据 ===== -->
+      <section class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+        <div class="stat-card text-center">
+          <div class="text-xs text-muted">总场次</div>
+          <div class="text-3xl font-black gold-text mt-1" x-text="player.matches"></div>
+        </div>
+        <div class="stat-card text-center">
+          <div class="text-xs text-muted">胜 / 负</div>
+          <div class="text-2xl font-black mt-1">
+            <span class="text-radianthi" x-text="player.wins"></span>
+            <span class="text-muted text-base"> / </span>
+            <span class="text-direhi" x-text="player.losses"></span>
+          </div>
+        </div>
+        <div class="stat-card text-center">
+          <div class="text-xs text-muted">胜率</div>
+          <div class="text-3xl font-black mt-1"
+               :class="player.winrate >= 55 ? 'text-radianthi' : player.winrate < 45 ? 'text-direhi' : 'gold-text'"
+               x-text="player.winrate + '%'"></div>
+        </div>
+        <div class="stat-card text-center">
+          <div class="text-xs text-muted">KDA</div>
+          <div class="text-3xl font-black gold-text mt-1" x-text="player.kda"></div>
+        </div>
+        <div class="stat-card text-center">
+          <div class="text-xs text-muted">实力分</div>
+          <div class="text-3xl font-black gold-text mt-1" x-text="player.skill_score"></div>
+        </div>
+        <div class="stat-card text-center">
+          <div class="text-xs text-muted">江雪杯排名</div>
+          <div class="text-3xl font-black gold-text mt-1" x-text="rank ? '#'+rank : '—'"></div>
+        </div>
+      </section>
+
+      <!-- ===== 战斗数据 ===== -->
+      <section class="panel p-5 mb-6">
+        <h2 class="font-bold text-gold mb-4 flex items-center gap-2">
+          <span class="w-1 h-4 bg-gold rounded"></span> ⚔️ 战斗数据
+        </h2>
+        <div class="grid grid-cols-3 md:grid-cols-6 gap-3 text-center">
+          <div>
+            <div class="text-xs text-muted">总击杀</div>
+            <div class="text-xl font-bold text-radianthi" x-text="player.kills"></div>
+            <div class="text-[10px] text-muted">场均 <span x-text="player.avg_kills"></span></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">总死亡</div>
+            <div class="text-xl font-bold text-direhi" x-text="player.deaths"></div>
+            <div class="text-[10px] text-muted">场均 <span x-text="player.avg_deaths"></span></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">总助攻</div>
+            <div class="text-xl font-bold text-gold" x-text="player.assists"></div>
+            <div class="text-[10px] text-muted">场均 <span x-text="player.avg_assists"></span></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">场均伤害</div>
+            <div class="text-xl font-bold text-gold" x-text="(player.avg_hero_damage/1000).toFixed(1)+'k'"></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">场均推塔</div>
+            <div class="text-xl font-bold text-gold" x-text="player.avg_tower_damage"></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">场均治疗</div>
+            <div class="text-xl font-bold text-gold" x-text="(player.avg_hero_healing/1000).toFixed(1)+'k'"></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">GPM</div>
+            <div class="text-xl font-bold gold-text" x-text="player.avg_gpm"></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">XPM</div>
+            <div class="text-xl font-bold gold-text" x-text="player.avg_xpm"></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">场均反补</div>
+            <div class="text-xl font-bold gold-text" x-text="player.avg_denies"></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">场均净值</div>
+            <div class="text-xl font-bold gold-text" x-text="(player.avg_net_worth/1000).toFixed(1)+'k'"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== 常用英雄 ===== -->
+      <section class="panel p-5 mb-6">
+        <h2 class="font-bold text-gold mb-4 flex items-center gap-2">
+          <span class="w-1 h-4 bg-gold rounded"></span> 🦸 常用英雄
+          <span class="text-xs text-muted font-normal" x-text="`(${player.top_heroes?.length || 0})`"></span>
+        </h2>
+        <div class="space-y-2">
+          <template x-for="h in player.top_heroes" :key="h.hero_id">
+            <div class="flex items-center gap-3 bg-panel2 p-2 rounded">
+              <img class="hero-icon" :src="h.icon" :alt="h.name" />
+              <div class="flex-1">
+                <div class="text-sm font-bold" x-text="h.name"></div>
+              </div>
+              <div class="text-xs text-muted text-right">
+                <div><span class="text-white font-bold" x-text="h.picks"></span> 场 ·
+                  <span class="text-radianthi" x-text="h.wins"></span> 胜 ·
+                  <span class="text-direhi" x-text="h.picks - h.wins"></span> 负
+                </div>
+                <div>
+                  胜率
+                  <span class="font-bold"
+                        :class="(h.wins/h.picks*100) >= 55 ? 'text-radianthi' : (h.wins/h.picks*100) < 45 ? 'text-direhi' : 'text-muted'"
+                        x-text="Math.round(h.wins/h.picks*100) + '%'"></span>
+                </div>
+              </div>
+            </div>
+          </template>
+          <div x-show="!player.top_heroes?.length" class="text-xs text-muted text-center py-4">暂无英雄数据</div>
+        </div>
+      </section>
+
+      <!-- ===== 最近对局 ===== -->
+      <section class="panel p-5 mb-6" x-show="myMatches.length">
+        <h2 class="font-bold text-gold mb-4 flex items-center gap-2">
+          <span class="w-1 h-4 bg-gold rounded"></span> 📜 最近对局
+          <span class="text-xs text-muted font-normal" x-text="`(显示 ${shownMatches.length} / ${myMatches.length})`"></span>
+        </h2>
+        <div class="space-y-2 max-h-[600px] overflow-y-auto pr-2">
+          <template x-for="m in shownMatches" :key="m.match_id">
+            <div @click="selectedMatch = m"
+                 class="cursor-pointer block bg-panel2 rounded p-3 border border-border hover:border-gold/40 transition"
+                 :class="m.myWin ? 'glow-radiant' : 'glow-dire'">
+              <div class="flex items-center justify-between text-xs mb-1">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                        :class="m.myWin ? 'bg-radiant/20 text-radianthi' : 'bg-dire/20 text-direhi'"
+                        x-text="m.myWin ? '胜' : '负'"></span>
+                  <img class="hero-icon" :src="m.myHero?.hero_icon" :alt="m.myHero?.hero_name"
+                       style="width:32px;height:32px"/>
+                  <span class="font-bold text-sm" x-text="m.myHero?.hero_name"></span>
+                </div>
+                <div class="flex items-center gap-3 text-muted">
+                  <span x-text="m.start_time"></span>
+                  <span class="font-mono" x-text="m.duration"></span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between mt-2 text-xs">
+                <div class="font-mono">
+                  <span class="text-radianthi font-bold" x-text="m.myHero?.kills"></span>/<span
+                        class="text-direhi font-bold" x-text="m.myHero?.deaths"></span>/<span
+                        class="text-gold font-bold" x-text="m.myHero?.assists"></span>
+                  <span class="text-muted ml-2">GPM <span x-text="m.myHero?.gpm"></span></span>
+                  <span class="text-muted ml-2">伤害 <span x-text="((m.myHero?.hero_damage||0)/1000).toFixed(1)"></span>k</span>
+                </div>
+                <div class="font-mono text-sm">
+                  <span class="text-radianthi" x-text="m.radiant_score"></span>
+                  <span class="text-muted mx-1">:</span>
+                  <span class="text-direhi" x-text="m.dire_score"></span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+        <div x-show="shownCount < myMatches.length" class="text-center pt-3">
+          <button @click="shownCount += 20"
+                  class="px-4 py-2 bg-panel2 border border-border rounded hover:border-gold/50 text-sm">
+            加载更多
+          </button>
+        </div>
+      </section>
+    </div>
+  </template>
+
+  <!-- ====== MATCH DETAIL DRAWER ====== -->
+  <div x-show="selectedMatch"
+       x-transition.opacity
+       @click="selectedMatch = null"
+       @keydown.escape.window="selectedMatch = null"
+       class="fixed inset-0 bg-black/60 z-40"
+       style="display: none"></div>
+
+  <aside x-show="selectedMatch"
+         x-transition:enter="transition transform ease-out duration-300"
+         x-transition:enter-start="translate-x-full"
+         x-transition:enter-end="translate-x-0"
+         x-transition:leave="transition transform ease-in duration-200"
+         x-transition:leave-start="translate-x-0"
+         x-transition:leave-end="translate-x-full"
+         class="fixed right-0 top-0 h-full w-full lg:w-[820px] bg-panel border-l border-border z-50 overflow-y-auto"
+         style="display: none">
+    <template x-if="selectedMatch">
+      <div class="p-6">
+        <div class="flex items-start justify-between mb-5">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="px-2 py-0.5 rounded text-xs font-bold"
+                    :class="selectedMatch.radiant_win ? 'badge-radiant' : 'badge-dire'"
+                    x-text="selectedMatch.radiant_win ? '天辉胜' : '夜魇胜'"></span>
+              <span class="font-mono text-xs text-muted" x-text="'#' + selectedMatch.match_id"></span>
+            </div>
+            <div class="text-2xl font-black">
+              <span class="text-radianthi" x-text="selectedMatch.radiant_score"></span>
+              <span class="text-muted mx-2">:</span>
+              <span class="text-direhi" x-text="selectedMatch.dire_score"></span>
+              <span class="text-sm text-muted font-normal ml-3"
+                    x-text="selectedMatch.duration + ' · ' + selectedMatch.start_time"></span>
+            </div>
+            <div class="text-xs mt-2 flex gap-3">
+              <a :href="selectedMatch.opendota" target="_blank" class="text-muted hover:text-gold">OpenDota ↗</a>
+              <a :href="selectedMatch.dotabuff" target="_blank" class="text-muted hover:text-gold">Dotabuff ↗</a>
+            </div>
+          </div>
+          <button @click="selectedMatch = null"
+                  class="text-muted hover:text-white text-3xl leading-none -mt-1">×</button>
+        </div>
+
+        <!-- 颁奖卡片 -->
+        <template x-if="matchAwards(selectedMatch)">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mb-6">
+            <template x-for="award in [
+              {icon:'👑', label:'综合 MVP',   player: matchAwards(selectedMatch).mvp,         color:'text-radianthi', sub: (p) => p.kills+'/'+p.deaths+'/'+p.assists+' · '+p.gpm+' GPM'},
+              {icon:'🚀', label:'最 C',        player: matchAwards(selectedMatch).carry,        color:'text-gold',      sub: (p) => Math.round(p.net_worth/1000)+'K净值 · '+Math.round(p.hero_damage/1000)+'K伤害'},
+              {icon:'🛌', label:'躺赢',        player: matchAwards(selectedMatch).carried,      color:'text-muted',     sub: (p) => p.kills+'/'+p.deaths+'/'+p.assists+' · '+p.gpm+' GPM'},
+              {icon:'💔', label:'败方 MVP',    player: matchAwards(selectedMatch).loserMvp,    color:'text-direhi',    sub: (p) => p.kills+'/'+p.deaths+'/'+p.assists+' · '+Math.round(p.hero_damage/1000)+'K伤害'},
+              {icon:'⚔️', label:'最多击杀',    player: matchAwards(selectedMatch).mostKills,   color:'text-gold',      sub: (p) => p.kills+' 击杀'},
+              {icon:'🤝', label:'最多助攻',    player: matchAwards(selectedMatch).mostAssists, color:'text-gold',      sub: (p) => p.assists+' 助攻'},
+            ]" :key="award.label">
+              <div class="bg-panel2 rounded p-3 border-l-2"
+                   :class="award.player.win ? 'border-radiant' : 'border-dire'">
+                <div class="flex items-center gap-2 mb-1.5">
+                  <span class="text-xl" x-text="award.icon"></span>
+                  <span class="text-[11px] text-muted uppercase tracking-wider" x-text="award.label"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <img :src="award.player.hero_icon" :alt="award.player.hero_name"
+                       class="w-8 h-8 rounded shrink-0" />
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-bold truncate" x-text="award.player.name"></div>
+                    <div class="text-[10px] text-muted truncate" x-text="award.player.hero_name"></div>
+                  </div>
+                </div>
+                <div class="text-[11px] mt-1.5" :class="award.color" x-text="award.sub(award.player)"></div>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- 双方阵容 -->
+        <template x-for="side in [{key:'radiant', label:'天辉 Radiant', color:'text-radianthi', isRad:true}, {key:'dire', label:'夜魇 Dire', color:'text-direhi', isRad:false}]" :key="side.key">
+          <div class="mb-5">
+            <h3 class="font-bold mb-2 flex items-center gap-2" :class="side.color">
+              <span x-text="side.label"></span>
+              <span class="text-xs font-normal text-muted"
+                    x-text="(side.isRad === selectedMatch.radiant_win ? '胜' : '败')"></span>
+            </h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead class="text-muted">
+                  <tr class="border-b border-border">
+                    <th class="text-left py-1.5 pr-2">英雄</th>
+                    <th class="text-left py-1.5 px-2">玩家</th>
+                    <th class="text-center py-1.5 px-2">Lv</th>
+                    <th class="text-center py-1.5 px-2">K / D / A</th>
+                    <th class="text-right py-1.5 px-2">GPM</th>
+                    <th class="text-right py-1.5 px-2">LH / DN</th>
+                    <th class="text-right py-1.5 px-2">净值</th>
+                    <th class="text-right py-1.5 px-2">伤害</th>
+                    <th class="text-right py-1.5 px-2">推塔</th>
+                    <th class="text-right py-1.5 px-2">治疗</th>
+                    <th class="text-right py-1.5 pl-2">评分</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="p in selectedMatch.players.filter(p => p.is_radiant === side.isRad).sort((a,b) => matchPlayerScore(selectedMatch,b) - matchPlayerScore(selectedMatch,a))" :key="p.account_id + '_' + p.hero_id">
+                    <tr class="border-b border-border/40 hover:bg-panel2/50">
+                      <td class="py-1.5 pr-2">
+                        <img :src="p.hero_icon" :alt="p.hero_name" :title="p.hero_name" class="w-8 h-8 rounded" />
+                      </td>
+                      <td class="py-1.5 px-2">
+                        <a :href="p.account_id ? `/player/${p.account_id}` : '#'"
+                           class="font-bold truncate max-w-[140px] block"
+                           :class="p.account_id ? 'cursor-pointer hover:text-gold' : ''"
+                           x-text="p.name"></a>
+                      </td>
+                      <td class="text-center font-mono" x-text="p.level"></td>
+                      <td class="text-center font-mono">
+                        <span class="text-radianthi" x-text="p.kills"></span>/<span
+                              class="text-direhi" x-text="p.deaths"></span>/<span
+                              class="text-gold" x-text="p.assists"></span>
+                      </td>
+                      <td class="text-right font-mono" x-text="p.gpm"></td>
+                      <td class="text-right font-mono text-muted" x-text="p.last_hits + '/' + p.denies"></td>
+                      <td class="text-right font-mono" x-text="(p.net_worth/1000).toFixed(1)+'K'"></td>
+                      <td class="text-right font-mono" x-text="(p.hero_damage/1000).toFixed(1)+'K'"></td>
+                      <td class="text-right font-mono text-muted" x-text="p.tower_damage"></td>
+                      <td class="text-right font-mono text-muted" x-text="p.hero_healing"></td>
+                      <td class="text-right font-mono font-bold gold-text"
+                          x-text="matchPlayerScore(selectedMatch, p)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+  </aside>
+
+</div>
+
+<script>
+function playerPage(accountId) {
+  return {
+    loading: true,
+    accountId,
+    player: null,
+    profile: null,
+    rank: null,
+    myMatches: [],
+    shownCount: 20,
+    selectedMatch: null,
+
+    async init() {
+      const [statsRes, profilesRes] = await Promise.all([
+        fetch('/api/stats').then(r => r.json()),
+        fetch('/api/profiles').then(r => r.json()),
+      ]);
+      const stats = statsRes.data;
+      const profiles = profilesRes || {};
+      if (stats) {
+        this._enrich(stats);
+        this.player = stats.players.find(p => p.account_id === this.accountId) || null;
+        if (this.player) {
+          this.profile = profiles[this.accountId] || null;
+          this.rank = stats.players
+            .filter(p => p.matches >= 15)
+            .sort((a, b) => (b.skill_score || 0) - (a.skill_score || 0))
+            .findIndex(p => p.account_id === this.accountId);
+          this.rank = this.rank >= 0 ? this.rank + 1 : null;
+          // 找出该玩家所有对局，附带他那场的英雄数据
+          this.myMatches = (stats.matches || [])
+            .map(m => {
+              const me = (m.players || []).find(p => p.account_id === this.accountId);
+              if (!me) return null;
+              return { ...m, myHero: me, myWin: me.win };
+            })
+            .filter(Boolean);
+        }
+      }
+      this.loading = false;
+    },
+
+    get shownMatches() {
+      return this.myMatches.slice(0, this.shownCount);
+    },
+
+    _enrich(stats) {
+      const score = (p) => (p.kills * 1.7 + p.assists * 2.0 - p.deaths * 0.5) * 80
+                         + (p.hero_damage   || 0) / 100
+                         + (p.tower_damage  || 0) / 45
+                         + (p.hero_healing  || 0) / 80
+                         + (p.gpm           || 0) * 1.2
+                         + (p.xpm           || 0) * 0.8
+                         + (p.last_hits     || 0) * 0.2
+                         + (p.denies        || 0) * 2.5
+                         + (p.net_worth     || 0) / 900
+                         + (p.level         || 0) * 2.8
+                         + (p.win ? 100 : 0);
+      const tot = {};
+      for (const m of stats.matches || []) {
+        for (const p of m.players || []) {
+          if (!p.account_id) continue;
+          if (!tot[p.account_id]) tot[p.account_id] = { s:0, gpm:0, hd:0, td:0, heal:0, dn:0, nw:0, xpm:0, n:0 };
+          const t = tot[p.account_id];
+          t.s += score(p);
+          t.gpm += p.gpm || 0;       t.xpm += p.xpm || 0;
+          t.hd  += p.hero_damage || 0;  t.td  += p.tower_damage || 0;
+          t.heal+= p.hero_healing || 0;  t.dn  += p.denies || 0;
+          t.nw  += p.net_worth || 0;
+          t.n++;
+        }
+      }
+      for (const p of stats.players) {
+        const t = tot[p.account_id];
+        if (t && t.n) {
+          p.skill_score      = Math.round(t.s   / t.n);
+          p.avg_gpm          = Math.round(t.gpm / t.n);
+          p.avg_xpm          = Math.round(t.xpm / t.n);
+          p.avg_hero_damage  = Math.round(t.hd  / t.n);
+          p.avg_tower_damage = Math.round(t.td  / t.n);
+          p.avg_hero_healing = Math.round(t.heal/ t.n);
+          p.avg_denies       = Math.round(t.dn  / t.n * 10) / 10;
+          p.avg_net_worth    = Math.round(t.nw  / t.n);
+        } else {
+          p.skill_score = 0;
+        }
+      }
+    },
+
+    positionLabel(pos) {
+      return ['', '1号位 大哥', '2号位 中单', '3号位 抗压路', '4号位 游走', '5号位 辅助'][pos] || '';
+    },
+
+    // 对局抽屉用的颁奖逻辑（跟战绩页同一套公式）
+    matchAwards(match) {
+      if (!match?.players?.length) return null;
+      const score = (p) => (p.kills * 1.7 + p.assists * 2.0 - p.deaths * 0.5) * 80
+                         + (p.hero_damage   || 0) / 100
+                         + (p.tower_damage  || 0) / 45
+                         + (p.hero_healing  || 0) / 80
+                         + (p.gpm           || 0) * 1.2
+                         + (p.xpm           || 0) * 0.8
+                         + (p.last_hits     || 0) * 0.2
+                         + (p.denies        || 0) * 2.5
+                         + (p.net_worth     || 0) / 900
+                         + (p.level         || 0) * 2.8
+                         + (p.win ? 100 : 0);
+      const cScore = (p) => p.net_worth / 1000 + p.hero_damage / 100;
+      const winners = match.players.filter(p => p.win);
+      const losers  = match.players.filter(p => !p.win);
+      const maxBy = (arr, fn) => arr.reduce((a, b) => fn(b) > fn(a) ? b : a);
+      const minBy = (arr, fn) => arr.reduce((a, b) => fn(b) < fn(a) ? b : a);
+      if (!winners.length || !losers.length) return null;
+      return {
+        mvp:         maxBy(winners, score),
+        loserMvp:    maxBy(losers,  score),
+        carry:       maxBy(winners, cScore),
+        carried:     minBy(winners, score),
+        mostKills:   maxBy(match.players, p => p.kills),
+        mostAssists: maxBy(match.players, p => p.assists),
+        scores: Object.fromEntries(match.players.map(p => [
+          p.account_id + '_' + p.hero_id, Math.round(score(p)),
+        ])),
+      };
+    },
+
+    matchPlayerScore(match, p) {
+      const a = this.matchAwards(match);
+      if (!a) return 0;
+      return a.scores[p.account_id + '_' + p.hero_id] || 0;
+    },
+  };
+}
+</script>
+
+</body></html>

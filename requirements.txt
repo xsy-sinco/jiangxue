@@ -1,0 +1,6 @@
+requests>=2.31.0
+openpyxl>=3.0.0
+tabulate>=0.9.0
+flask>=2.3.0
+flask-compress>=1.13
+gunicorn>=21.0.0

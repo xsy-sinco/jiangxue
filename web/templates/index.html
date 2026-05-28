@@ -1,0 +1,1610 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🏆 江雪杯</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stop-color='%23f0d486'/><stop offset='100%' stop-color='%23c8aa6e'/></linearGradient></defs><rect width='100' height='100' rx='20' fill='%230a0e1a'/><text x='50' y='72' font-size='70' text-anchor='middle' fill='url(%23g)'>%F0%9F%8F%86</text></svg>" />
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0a0e1a',
+            panel: '#141a2a',
+            panel2: '#1c2338',
+            border: '#2a3148',
+            gold: '#c8aa6e',
+            goldhi: '#f0d486',
+            radiant: '#92a629',
+            radianthi: '#b5cf3b',
+            dire: '#c23c2a',
+            direhi: '#e85a45',
+            muted: '#7a8499',
+          },
+          fontFamily: {
+            display: ['"Noto Sans SC"', '"Microsoft YaHei"', 'system-ui', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+  <script src="/static/vendor/chart.umd.min.js"></script>
+  <style>
+    body {
+      background:
+        radial-gradient(circle at 20% 0%, rgba(146, 166, 41, 0.08), transparent 40%),
+        radial-gradient(circle at 80% 100%, rgba(194, 60, 42, 0.08), transparent 40%),
+        linear-gradient(180deg, #0a0e1a, #06090f);
+      color: #e8eaed;
+      min-height: 100vh;
+    }
+    .panel {
+      background: linear-gradient(180deg, rgba(28,35,56,.85), rgba(20,26,42,.85));
+      border: 1px solid #2a3148;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .gold-text {
+      background: linear-gradient(180deg, #f0d486 0%, #c8aa6e 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-icon {
+      width: 36px; height: 36px;
+      border-radius: 6px;
+      border: 1px solid #2a3148;
+      background: #0a0e1a;
+      object-fit: cover;
+      transition: transform .15s;
+    }
+    .hero-icon:hover { transform: scale(1.5); border-color: #c8aa6e; z-index: 10; position: relative; }
+    .hero-portrait {
+      width: 100%; aspect-ratio: 16/9;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+    .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+    .scroll-thin::-webkit-scrollbar-track { background: #0a0e1a; }
+    .scroll-thin::-webkit-scrollbar-thumb { background: #2a3148; border-radius: 4px; }
+    .scroll-thin::-webkit-scrollbar-thumb:hover { background: #c8aa6e; }
+    th.sortable { cursor: pointer; user-select: none; }
+    th.sortable:hover { color: #f0d486; }
+    .badge-radiant { background: rgba(146,166,41,.18); color: #b5cf3b; border: 1px solid rgba(146,166,41,.3); }
+    .badge-dire { background: rgba(194,60,42,.18); color: #e85a45; border: 1px solid rgba(194,60,42,.3); }
+    .row-hover:hover { background: rgba(200,170,110,.06); }
+    .glow-radiant { box-shadow: inset 4px 0 0 #92a629; }
+    .glow-dire { box-shadow: inset 4px 0 0 #c23c2a; }
+    .tab-active { color: #f0d486; border-bottom-color: #c8aa6e; }
+    @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+    .spin { animation: spin 1s linear infinite; }
+  </style>
+</head>
+<body class="font-display antialiased">
+
+{% include "_nav.html" %}
+
+<div x-data="dashboard()" x-init="init()" class="max-w-[1400px] mx-auto px-4 py-6">
+
+  <!-- ====== HEADER ====== -->
+  <header class="panel p-6 mb-6 relative overflow-hidden">
+    <div class="absolute -right-12 -top-12 w-64 h-64 rounded-full opacity-10"
+         style="background: radial-gradient(circle, #c8aa6e, transparent 70%);"></div>
+    <div class="flex flex-wrap items-center justify-between gap-4 relative">
+      <div>
+        <div class="flex items-center gap-4">
+          <span class="text-5xl md:text-6xl drop-shadow-[0_0_18px_rgba(200,170,110,0.6)]">🏆</span>
+          <div>
+            <h1 class="text-5xl md:text-6xl font-black gold-text leading-none"
+                style="text-shadow: 0 0 40px rgba(200,170,110,0.35); letter-spacing: 0.12em">
+              江雪杯
+            </h1>
+            <div class="text-[11px] text-muted mt-2 flex items-center gap-2 tracking-[0.3em] italic">
+              <span class="w-10 h-px bg-gradient-to-r from-transparent to-gold/50"></span>
+              <span class="text-gold/80">⚔ 一个和谐友爱的 Dota2 社区 ⚔</span>
+              <span class="w-10 h-px bg-gradient-to-l from-transparent to-gold/50"></span>
+            </div>
+          </div>
+        </div>
+        <p class="text-muted text-xs mt-3 ml-1">
+          <span class="opacity-70" x-text="data?.league_name || ('League #' + {{ league_id }})"></span> ·
+          <span x-show="updatedAt">最后更新 <span x-text="formatUpdate(updatedAt)"></span></span>
+          <span x-show="!updatedAt">尚未拉取数据</span>
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button @click="refresh()" :disabled="loading"
+                class="px-4 py-2 rounded-md bg-gold text-bg font-bold hover:bg-goldhi disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition">
+          <svg class="w-4 h-4" :class="loading && 'spin'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          <span x-text="loading ? '刷新中…' : '刷新数据'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div x-show="loading" x-transition class="mt-4">
+      <div class="text-sm text-muted mb-1" x-text="progress.message || '准备中…'"></div>
+      <div class="w-full h-2 bg-bg rounded-full overflow-hidden">
+        <div class="h-full bg-gradient-to-r from-gold to-goldhi transition-all duration-300"
+             :style="`width: ${progress.total ? (progress.current / progress.total * 100) : 5}%`"></div>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div x-show="error" class="mt-4 p-3 rounded bg-dire/20 border border-dire/40 text-direhi text-sm" x-text="error"></div>
+  </header>
+
+  <!-- ====== KPI CARDS ====== -->
+  <section x-show="data" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-6">
+    <template x-for="kpi in kpis()" :key="kpi.label">
+      <div class="panel p-4">
+        <div class="text-xs text-muted uppercase tracking-wider" x-text="kpi.label"></div>
+        <div class="text-2xl font-black mt-1" :class="kpi.color || 'gold-text'" x-text="kpi.value"></div>
+        <div class="text-xs text-muted mt-1" x-text="kpi.sub"></div>
+      </div>
+    </template>
+  </section>
+
+  <!-- ====== TEAM HIGHLIGHTS ====== -->
+  <section x-show="data" class="mb-6">
+    <h2 class="text-xs text-muted uppercase tracking-wider mb-2 flex items-center gap-2">
+      <span class="w-1 h-3 bg-gold rounded"></span> 团队记录
+    </h2>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <template x-for="h in teamHighlights()" :key="h.label">
+        <a :href="h.url" target="_blank"
+           class="panel p-4 hover:border-gold/50 transition block group">
+          <div class="text-xs text-muted uppercase tracking-wider flex items-center gap-1.5">
+            <span x-text="h.icon" class="text-base"></span>
+            <span x-text="h.label"></span>
+          </div>
+          <div class="text-xl font-black mt-1 gold-text group-hover:text-goldhi" x-text="h.value"></div>
+          <div class="text-xs text-muted mt-1 leading-tight" x-text="h.sub"></div>
+        </a>
+      </template>
+    </div>
+  </section>
+
+  <!-- ====== TEAM AWARDS ====== -->
+  <section x-show="data" class="mb-6">
+    <h2 class="text-xs text-muted uppercase tracking-wider mb-2 flex items-center gap-2">
+      <span class="w-1 h-3 bg-gold rounded"></span> 个人称号 <span class="font-normal text-muted/70">(点击查看玩家详情)</span>
+    </h2>
+
+    <!-- 全部对局 -->
+    <div class="text-[11px] mb-2 flex items-center gap-2">
+      <span class="px-2 py-0.5 bg-gold/20 text-gold rounded font-bold tracking-wider">全部</span>
+      <span class="text-muted" x-text="`基于 ${data.summary.total_matches} 场`"></span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+      <template x-for="a in teamAwards()" :key="'all-' + a.label">
+        <div class="panel p-4 transition group"
+             :class="a.player ? 'hover:border-gold/50 cursor-pointer' : 'opacity-60'"
+             @click="a.player && (drawerPlayer = a.player)">
+          <div class="text-3xl mb-1" x-text="a.icon"></div>
+          <div class="text-xs text-muted uppercase tracking-wider" x-text="a.label"></div>
+          <div class="text-sm font-bold mt-1 truncate group-hover:text-goldhi"
+               x-text="a.player?.name || '—'"></div>
+          <div class="text-lg font-black gold-text mt-0.5" x-text="a.value"></div>
+          <div class="text-[10px] text-muted mt-0.5" x-text="a.sub"></div>
+        </div>
+      </template>
+    </div>
+
+    <!-- 近 7 天 -->
+    <div class="text-[11px] mb-2 flex items-center gap-2">
+      <span class="px-2 py-0.5 bg-radiant/30 text-radianthi rounded font-bold tracking-wider">近 7 天</span>
+      <span class="text-muted" x-text="`基于 ${recentMatchCount()} 场`"></span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <template x-for="a in teamAwardsRecent()" :key="'recent-' + a.label">
+        <div class="panel p-4 transition group border-l-2 border-radiant/40"
+             :class="a.player ? 'hover:border-l-radianthi cursor-pointer' : 'opacity-60'"
+             @click="a.player && openPlayerDrawer(a.player.account_id)">
+          <div class="text-3xl mb-1" x-text="a.icon"></div>
+          <div class="text-xs text-muted uppercase tracking-wider" x-text="a.label"></div>
+          <div class="text-sm font-bold mt-1 truncate group-hover:text-radianthi"
+               x-text="a.player?.name || '—'"></div>
+          <div class="text-lg font-black mt-0.5"
+               :class="a.player ? 'text-radianthi' : 'text-muted'" x-text="a.value"></div>
+          <div class="text-[10px] text-muted mt-0.5" x-text="a.sub"></div>
+        </div>
+      </template>
+    </div>
+  </section>
+
+  <!-- ====== CHARTS ROW 1 ====== -->
+  <section x-show="data" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <div class="panel p-5">
+      <h2 class="font-bold text-gold mb-3 flex items-center gap-2">
+        <span class="w-1 h-4 bg-gold rounded"></span> 对局时长分布
+      </h2>
+      <div class="relative" style="height:240px"><canvas id="durationChart"></canvas></div>
+    </div>
+    <div class="panel p-5">
+      <h2 class="font-bold text-gold mb-3 flex items-center gap-2">
+        <span class="w-1 h-4 bg-gold rounded"></span> 每周对局数
+        <span class="text-xs text-muted font-normal ml-1">最近 12 周</span>
+      </h2>
+      <div class="relative" style="height:240px"><canvas id="trendChart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- ====== CHARTS ROW 2 ====== -->
+  <section x-show="data" class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+    <div class="panel p-5">
+      <h2 class="font-bold text-gold mb-3 flex items-center gap-2">
+        <span class="w-1 h-4 bg-gold rounded"></span> 比赛节奏
+        <span class="text-xs text-muted font-normal ml-1">按双方得分差距</span>
+      </h2>
+      <div class="relative" style="height:260px"><canvas id="paceChart"></canvas></div>
+    </div>
+    <div class="panel p-5">
+      <h2 class="font-bold text-gold mb-3 flex items-center gap-2">
+        <span class="w-1 h-4 bg-gold rounded"></span> 英雄热度 × 胜率
+        <span class="text-xs text-muted font-normal ml-1">右上=真本命 · 右下=烫手</span>
+      </h2>
+      <div class="relative" style="height:260px"><canvas id="heroScatter"></canvas></div>
+    </div>
+  </section>
+
+  <!-- ====== ACTIVITY HEATMAP ====== -->
+  <section x-show="data" class="panel p-5 mb-6">
+    <h2 class="font-bold text-gold mb-3 flex items-center gap-2">
+      <span class="w-1 h-4 bg-gold rounded"></span> 活动时段
+      <span class="text-xs text-muted font-normal ml-1">什么时段大家在开黑</span>
+    </h2>
+    <div class="overflow-x-auto scroll-thin">
+      <div class="inline-block min-w-full">
+        <!-- 小时表头 -->
+        <div class="flex gap-0.5">
+          <div class="w-10 shrink-0"></div>
+          <template x-for="h in 24" :key="h">
+            <div class="flex-1 text-center text-[10px] text-muted min-w-[20px]"
+                 x-text="(h-1) % 3 === 0 ? (h-1) : ''"></div>
+          </template>
+        </div>
+        <!-- 7 天 × 24 小时 -->
+        <template x-for="row in heatmapRows()" :key="row.day">
+          <div class="flex items-center gap-0.5 mt-0.5">
+            <div class="w-10 shrink-0 text-xs text-muted text-right pr-2" x-text="row.dayLabel"></div>
+            <template x-for="cell in row.cells" :key="cell.hour">
+              <div class="flex-1 aspect-square min-w-[20px] rounded-sm border border-border/40 transition hover:border-gold/60 hover:scale-110"
+                   :style="`background-color: rgba(200,170,110, ${cell.alpha})`"
+                   :title="`${row.dayLabel} ${cell.hour}:00 — ${cell.count} 场`"></div>
+            </template>
+          </div>
+        </template>
+        <!-- 图例 -->
+        <div class="flex items-center justify-end gap-2 mt-4 text-xs text-muted">
+          <span>少</span>
+          <template x-for="t in [0.08, 0.25, 0.45, 0.7, 1.0]" :key="t">
+            <div class="w-4 h-4 rounded-sm border border-border/40"
+                 :style="`background-color: rgba(200,170,110, ${t})`"></div>
+          </template>
+          <span>多</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== TABS ====== -->
+  <nav id="tabs-nav" x-show="data" class="flex gap-1 mb-4 border-b border-border">
+    <template x-for="t in ['players','heroes','matches']">
+      <button @click="tab=t" class="px-5 py-3 text-sm font-bold border-b-2 transition"
+              :class="tab===t ? 'tab-active' : 'border-transparent text-muted hover:text-white'">
+        <span x-text="tabLabels[t]"></span>
+        <span class="ml-1 text-xs opacity-60" x-text="`(${tabCounts[t]})`"></span>
+      </button>
+    </template>
+  </nav>
+
+  <!-- ====== PLAYERS TAB ====== -->
+  <section x-show="data && tab==='players'" class="panel p-4">
+    <div class="flex items-center gap-3 mb-3">
+      <input type="text" x-model="playerQueryDraft"
+             @keydown.enter="commitSearch('player')"
+             @input="clearSearchIfEmpty('player')"
+             placeholder="搜玩家昵称或 account_id（按回车搜索）…"
+             class="flex-1 bg-bg border border-border rounded px-3 py-2 text-sm focus:border-gold outline-none" />
+      <span class="text-xs text-muted">点击表头排序</span>
+    </div>
+    <div class="overflow-x-auto scroll-thin">
+      <table class="w-full text-sm">
+        <thead class="text-muted uppercase text-xs">
+          <tr class="border-b border-border">
+            <th class="text-left py-2 px-2">#</th>
+            <th class="text-left py-2 px-2 sortable" @click="sortPlayers('name')">玩家</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortPlayers('matches')">场</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortPlayers('wins')">胜</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortPlayers('winrate')">胜率</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortPlayers('kills')">K</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortPlayers('deaths')">D</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortPlayers('assists')">A</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortPlayers('kda')">KDA</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortPlayers('skill_score')">实力分</th>
+            <th class="text-left py-2 px-2">常用英雄 Top 5</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(p, idx) in pagedSlice(filteredPlayers(), playerPage, pageSize)" :key="p.account_id">
+            <tr class="border-b border-border row-hover cursor-pointer" @click="drawerPlayer = p">
+              <td class="py-2 px-2 text-muted" x-text="(playerPage-1)*pageSize + idx + 1"></td>
+              <td class="py-2 px-2">
+                <div class="font-bold" x-text="p.name"></div>
+                <a class="text-xs text-muted hover:text-gold" :href="`https://www.opendota.com/players/${p.account_id}`" target="_blank" x-text="p.account_id" @click.stop></a>
+              </td>
+              <td class="text-right font-mono" x-text="p.matches"></td>
+              <td class="text-right font-mono">
+                <span class="text-radianthi" x-text="p.wins"></span> /
+                <span class="text-direhi" x-text="p.losses"></span>
+              </td>
+              <td class="text-right">
+                <span class="px-2 py-0.5 rounded text-xs font-bold"
+                      :class="p.winrate >= 55 ? 'badge-radiant' : (p.winrate < 45 ? 'badge-dire' : 'bg-panel2 text-muted')"
+                      x-text="p.winrate + '%'"></span>
+              </td>
+              <td class="text-right font-mono" x-text="p.kills"></td>
+              <td class="text-right font-mono" x-text="p.deaths"></td>
+              <td class="text-right font-mono" x-text="p.assists"></td>
+              <td class="text-right font-mono font-bold text-gold" x-text="p.kda"></td>
+              <td class="text-right font-mono font-bold whitespace-nowrap">
+                <span :class="p.skill_score >= 800 ? 'text-radianthi' : p.skill_score >= 500 ? 'text-gold' : p.skill_score < 300 ? 'text-direhi' : 'text-muted'"
+                      x-text="p.skill_score ?? 0"></span>
+                <span x-show="p.rank_change_label" class="text-xs ml-1" :class="p.rank_change_color" x-text="p.rank_change_label"></span>
+              </td>
+              <td class="py-2 px-2">
+                <div class="flex gap-1">
+                  <template x-for="h in p.top_heroes" :key="h.hero_id">
+                    <img :src="h.icon" :alt="h.name"
+                         :title="`${h.name}  ${h.picks}场 / ${h.wins}胜`"
+                         class="hero-icon" loading="lazy" />
+                  </template>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <!-- 分页 -->
+    <div class="flex items-center justify-between mt-4 px-1 text-xs text-muted" x-show="filteredPlayers().length > 0">
+      <div>
+        共 <span class="text-white font-bold" x-text="filteredPlayers().length"></span> 名玩家 ·
+        第 <span x-text="(playerPage-1)*pageSize+1"></span>-<span x-text="Math.min(playerPage*pageSize, filteredPlayers().length)"></span> 名
+      </div>
+      <div class="flex items-center gap-1">
+        <button @click="goPage('player', -1)" :disabled="playerPage <= 1"
+                class="px-3 py-1 rounded border border-border hover:border-gold/40 disabled:opacity-30 disabled:cursor-not-allowed">‹ 上一页</button>
+        <span class="px-3">第 <span class="text-gold font-bold" x-text="playerPage"></span> / <span x-text="pageCount(filteredPlayers().length, pageSize)"></span> 页</span>
+        <button @click="goPage('player', 1)" :disabled="playerPage >= pageCount(filteredPlayers().length, pageSize)"
+                class="px-3 py-1 rounded border border-border hover:border-gold/40 disabled:opacity-30 disabled:cursor-not-allowed">下一页 ›</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== HEROES TAB ====== -->
+  <section x-show="data && tab==='heroes'" class="panel p-4">
+    <div class="flex items-center gap-3 mb-3">
+      <input type="text" x-model="heroQueryDraft"
+             @keydown.enter="commitSearch('hero')"
+             @input="clearSearchIfEmpty('hero')"
+             placeholder="搜英雄名（按回车搜索，支持 sf=Shadow Fiend 这种缩写）…"
+             class="flex-1 bg-bg border border-border rounded px-3 py-2 text-sm focus:border-gold outline-none" />
+      <span class="text-xs text-muted">点击表头排序</span>
+    </div>
+    <div class="overflow-x-auto scroll-thin">
+      <table class="w-full text-sm">
+        <thead class="text-muted uppercase text-xs">
+          <tr class="border-b border-border">
+            <th class="text-left py-2 px-2">#</th>
+            <th class="text-left py-2 px-2 sortable" @click="sortHeroes('name')">英雄</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortHeroes('picks')">出场</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortHeroes('wins')">胜场</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortHeroes('winrate')">胜率</th>
+            <th class="text-right py-2 px-2 sortable" @click="sortHeroes('kda')">累计 KDA</th>
+            <th class="text-left py-2 px-2 w-1/3">出场频次</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(h, idx) in pagedSlice(filteredHeroes(), heroPage, pageSize)" :key="h.hero_id">
+            <tr class="border-b border-border row-hover">
+              <td class="py-2 px-2 text-muted" x-text="(heroPage-1)*pageSize + idx + 1"></td>
+              <td class="py-2 px-2 flex items-center gap-3">
+                <img :src="h.icon" :alt="h.name" class="hero-icon" loading="lazy" />
+                <span class="font-bold" x-text="h.name"></span>
+              </td>
+              <td class="text-right font-mono" x-text="h.picks"></td>
+              <td class="text-right font-mono">
+                <span class="text-radianthi" x-text="h.wins"></span>
+              </td>
+              <td class="text-right">
+                <span class="px-2 py-0.5 rounded text-xs font-bold"
+                      :class="h.winrate >= 55 ? 'badge-radiant' : (h.winrate < 45 ? 'badge-dire' : 'bg-panel2 text-muted')"
+                      x-text="h.winrate + '%'"></span>
+              </td>
+              <td class="text-right font-mono font-bold text-gold" x-text="h.kda"></td>
+              <td class="py-2 px-2">
+                <div class="w-full h-2 bg-bg rounded-full overflow-hidden">
+                  <div class="h-full bg-gradient-to-r from-gold to-goldhi"
+                       :style="`width: ${data ? (h.picks / data.heroes[0].picks * 100) : 0}%`"></div>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <!-- 分页 -->
+    <div class="flex items-center justify-between mt-4 px-1 text-xs text-muted" x-show="filteredHeroes().length > 0">
+      <div>
+        共 <span class="text-white font-bold" x-text="filteredHeroes().length"></span> 个英雄 ·
+        第 <span x-text="(heroPage-1)*pageSize+1"></span>-<span x-text="Math.min(heroPage*pageSize, filteredHeroes().length)"></span>
+      </div>
+      <div class="flex items-center gap-1">
+        <button @click="goPage('hero', -1)" :disabled="heroPage <= 1"
+                class="px-3 py-1 rounded border border-border hover:border-gold/40 disabled:opacity-30 disabled:cursor-not-allowed">‹ 上一页</button>
+        <span class="px-3">第 <span class="text-gold font-bold" x-text="heroPage"></span> / <span x-text="pageCount(filteredHeroes().length, pageSize)"></span> 页</span>
+        <button @click="goPage('hero', 1)" :disabled="heroPage >= pageCount(filteredHeroes().length, pageSize)"
+                class="px-3 py-1 rounded border border-border hover:border-gold/40 disabled:opacity-30 disabled:cursor-not-allowed">下一页 ›</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== MATCHES TAB ====== -->
+  <section x-show="data && tab==='matches'" class="panel p-4">
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+      <input type="text" x-model="matchQueryDraft"
+             @keydown.enter="commitSearch('match')"
+             @input="clearSearchIfEmpty('match')"
+             placeholder="搜阵容里的英雄、或 match_id（按回车搜索）…"
+             class="flex-1 min-w-[260px] bg-bg border border-border rounded px-3 py-2 text-sm focus:border-gold outline-none" />
+      <select x-model="matchWinFilter" @change="matchPage = 1" class="bg-bg border border-border rounded px-3 py-2 text-sm">
+        <option value="all">全部</option>
+        <option value="radiant">天辉胜</option>
+        <option value="dire">夜魇胜</option>
+      </select>
+      <span class="text-xs text-muted">显示 <span x-text="visibleMatchCount()"></span> / <span x-text="data?.matches?.length || 0"></span> 场</span>
+    </div>
+
+    <div class="space-y-2 max-h-[70vh] overflow-y-auto scroll-thin pr-2">
+      <template x-for="m in pagedSlice(filteredMatches(), matchPage, pageSize)" :key="m.match_id">
+        <div class="bg-panel2 rounded-lg p-3 border border-border hover:border-gold/40 transition cursor-pointer"
+             @click="selectedMatch = m"
+             :class="m.radiant_win ? 'glow-radiant' : 'glow-dire'">
+          <div class="flex items-center justify-between mb-2 text-xs">
+            <div class="flex items-center gap-3">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                    :class="m.radiant_win ? 'badge-radiant' : 'badge-dire'"
+                    x-text="m.radiant_win ? '天辉胜' : '夜魇胜'"></span>
+              <span class="text-muted" x-text="m.start_time"></span>
+              <span class="text-muted">·</span>
+              <span class="text-muted">时长 <span class="font-mono text-white" x-text="m.duration"></span></span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="font-mono text-sm">
+                <span class="text-radianthi font-bold" x-text="m.radiant_score"></span>
+                <span class="text-muted mx-1">:</span>
+                <span class="text-direhi font-bold" x-text="m.dire_score"></span>
+              </span>
+              <a :href="m.opendota" target="_blank" class="text-muted hover:text-gold text-xs" @click.stop>OD↗</a>
+              <a :href="m.dotabuff" target="_blank" class="text-muted hover:text-gold text-xs" @click.stop>DB↗</a>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div :class="m.radiant_win ? 'opacity-100' : 'opacity-60'">
+              <div class="text-[10px] text-radianthi uppercase font-bold mb-1">Radiant 天辉</div>
+              <div class="flex gap-1 flex-wrap">
+                <template x-for="hname in m.radiant_players" :key="hname">
+                  <img :src="heroIconByName(hname)" :alt="hname" :title="hname" class="hero-icon" loading="lazy"/>
+                </template>
+              </div>
+            </div>
+            <div :class="!m.radiant_win ? 'opacity-100' : 'opacity-60'">
+              <div class="text-[10px] text-direhi uppercase font-bold mb-1">Dire 夜魇</div>
+              <div class="flex gap-1 flex-wrap">
+                <template x-for="hname in m.dire_players" :key="hname">
+                  <img :src="heroIconByName(hname)" :alt="hname" :title="hname" class="hero-icon" loading="lazy"/>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+    </div>
+    <!-- 分页 -->
+    <div class="flex items-center justify-between mt-4 px-1 text-xs text-muted" x-show="filteredMatches().length > 0">
+      <div>
+        共 <span class="text-white font-bold" x-text="filteredMatches().length"></span> 场对局 ·
+        第 <span x-text="(matchPage-1)*pageSize+1"></span>-<span x-text="Math.min(matchPage*pageSize, filteredMatches().length)"></span>
+      </div>
+      <div class="flex items-center gap-1">
+        <button @click="goPage('match', -1)" :disabled="matchPage <= 1"
+                class="px-3 py-1 rounded border border-border hover:border-gold/40 disabled:opacity-30 disabled:cursor-not-allowed">‹ 上一页</button>
+        <span class="px-3">第 <span class="text-gold font-bold" x-text="matchPage"></span> / <span x-text="pageCount(filteredMatches().length, pageSize)"></span> 页</span>
+        <button @click="goPage('match', 1)" :disabled="matchPage >= pageCount(filteredMatches().length, pageSize)"
+                class="px-3 py-1 rounded border border-border hover:border-gold/40 disabled:opacity-30 disabled:cursor-not-allowed">下一页 ›</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== EMPTY STATE ====== -->
+  <div x-show="!data && !loading" class="panel p-12 text-center">
+    <div class="text-6xl mb-3">📭</div>
+    <h3 class="text-xl font-bold text-gold mb-2">还没有数据</h3>
+    <p class="text-muted text-sm">点击右上角"刷新数据"开始拉取</p>
+  </div>
+
+  <footer class="text-center text-xs text-muted mt-8 py-4">
+    数据来源：Steam Web API · OpenDota · 头像来源：Steamstatic CDN
+  </footer>
+
+  <!-- ====== PLAYER DETAIL DRAWER ====== -->
+  <div x-show="drawerPlayer"
+       x-transition.opacity
+       @click="closePlayerDrawer()"
+       @keydown.escape.window="closePlayerDrawer()"
+       class="fixed inset-0 bg-black/60 z-40"
+       style="display: none"></div>
+
+  <aside x-show="drawerPlayer"
+         x-transition:enter="transition transform ease-out duration-300"
+         x-transition:enter-start="translate-x-full"
+         x-transition:enter-end="translate-x-0"
+         x-transition:leave="transition transform ease-in duration-200"
+         x-transition:leave-start="translate-x-0"
+         x-transition:leave-end="translate-x-full"
+         class="fixed right-0 top-0 h-full w-full md:w-[460px] bg-panel border-l border-border z-50 overflow-y-auto scroll-thin"
+         style="display: none">
+    <template x-if="drawerPlayer">
+      <div class="p-6">
+        <!-- Header -->
+        <div class="flex items-start justify-between mb-5">
+          <div>
+            <h2 class="text-2xl font-black gold-text" x-text="drawerPlayer.name"></h2>
+            <div class="text-xs text-muted mt-1 font-mono" x-text="drawerPlayer.account_id"></div>
+            <div class="text-xs mt-2 flex gap-3">
+              <a :href="`https://www.opendota.com/players/${drawerPlayer.account_id}`" target="_blank"
+                 class="text-muted hover:text-gold">OpenDota ↗</a>
+              <a :href="`https://www.dotabuff.com/players/${drawerPlayer.account_id}`" target="_blank"
+                 class="text-muted hover:text-gold">Dotabuff ↗</a>
+            </div>
+          </div>
+          <button @click="closePlayerDrawer()"
+                  class="text-muted hover:text-white text-3xl leading-none -mt-1">×</button>
+        </div>
+
+        <!-- 三大核心数 -->
+        <div class="grid grid-cols-3 gap-2 mb-5">
+          <div class="bg-panel2 p-3 rounded text-center cursor-pointer hover:bg-panel border border-transparent hover:border-gold/40 transition"
+               @click="showPlayerMatches(drawerPlayer)"
+               title="点击查看他参与的对局">
+            <div class="text-xs text-muted">场次 ↗</div>
+            <div class="text-2xl font-black mt-1" x-text="drawerPlayer.matches"></div>
+          </div>
+          <div class="bg-panel2 p-3 rounded text-center">
+            <div class="text-xs text-muted">胜率</div>
+            <div class="text-2xl font-black mt-1"
+                 :class="drawerPlayer.winrate >= 50 ? 'text-radianthi' : 'text-direhi'"
+                 x-text="drawerPlayer.winrate + '%'"></div>
+          </div>
+          <div class="bg-panel2 p-3 rounded text-center">
+            <div class="text-xs text-muted">KDA</div>
+            <div class="text-2xl font-black mt-1 gold-text" x-text="drawerPlayer.kda"></div>
+          </div>
+        </div>
+
+        <!-- 胜负条 -->
+        <div class="mb-5">
+          <div class="text-xs text-muted uppercase tracking-wider mb-2">胜负分布</div>
+          <div class="flex h-9 rounded overflow-hidden text-xs font-bold">
+            <div class="bg-radiant flex items-center justify-center"
+                 :style="`width: ${drawerPlayer.matches ? drawerPlayer.wins / drawerPlayer.matches * 100 : 0}%`">
+              <span x-show="drawerPlayer.wins > 0" x-text="drawerPlayer.wins + ' 胜'"></span>
+            </div>
+            <div class="bg-dire flex items-center justify-center"
+                 :style="`width: ${drawerPlayer.matches ? drawerPlayer.losses / drawerPlayer.matches * 100 : 0}%`">
+              <span x-show="drawerPlayer.losses > 0" x-text="drawerPlayer.losses + ' 负'"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- K/D/A 详细 -->
+        <div class="grid grid-cols-3 gap-2 mb-5">
+          <div class="bg-panel2 p-3 rounded">
+            <div class="text-xs text-muted">总击杀</div>
+            <div class="text-lg font-bold text-radianthi" x-text="drawerPlayer.kills"></div>
+            <div class="text-[10px] text-muted mt-0.5">场均 <span x-text="drawerPlayer.avg_kills"></span></div>
+          </div>
+          <div class="bg-panel2 p-3 rounded">
+            <div class="text-xs text-muted">总死亡</div>
+            <div class="text-lg font-bold text-direhi" x-text="drawerPlayer.deaths"></div>
+            <div class="text-[10px] text-muted mt-0.5">场均 <span x-text="drawerPlayer.avg_deaths"></span></div>
+          </div>
+          <div class="bg-panel2 p-3 rounded">
+            <div class="text-xs text-muted">总助攻</div>
+            <div class="text-lg font-bold text-gold" x-text="drawerPlayer.assists"></div>
+            <div class="text-[10px] text-muted mt-0.5">场均 <span x-text="drawerPlayer.avg_assists"></span></div>
+          </div>
+        </div>
+
+        <!-- Top heroes -->
+        <div>
+          <div class="text-xs text-muted uppercase tracking-wider mb-2">
+            常用英雄 <span class="font-normal" x-text="`(${drawerPlayer.top_heroes?.length || 0})`"></span>
+          </div>
+          <div class="space-y-2">
+            <template x-for="h in drawerPlayer.top_heroes" :key="h.hero_id">
+              <div class="flex items-center gap-3 bg-panel2 p-2 rounded">
+                <img :src="h.icon" :alt="h.name" class="w-10 h-10 rounded shrink-0" />
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-bold truncate" x-text="h.name"></div>
+                  <div class="text-xs text-muted">
+                    <span x-text="h.picks"></span> 场 ·
+                    <span class="text-radianthi" x-text="h.wins + ' 胜'"></span>
+                  </div>
+                </div>
+                <div class="text-sm font-bold shrink-0"
+                     :class="(h.wins/h.picks*100) >= 55 ? 'text-radianthi' : ((h.wins/h.picks*100) < 45 ? 'text-direhi' : 'text-muted')"
+                     x-text="Math.round(h.wins/h.picks*100) + '%'"></div>
+              </div>
+            </template>
+            <div x-show="!drawerPlayer.top_heroes || drawerPlayer.top_heroes.length === 0"
+                 class="text-xs text-muted text-center py-4">暂无英雄数据</div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </aside>
+
+  <!-- ====== MATCH DETAIL DRAWER ====== -->
+  <div x-show="selectedMatch"
+       x-transition.opacity
+       @click="closeMatchDrawer()"
+       @keydown.escape.window="closeMatchDrawer()"
+       class="fixed inset-0 bg-black/60 z-40"
+       style="display: none"></div>
+
+  <aside x-show="selectedMatch"
+         x-transition:enter="transition transform ease-out duration-300"
+         x-transition:enter-start="translate-x-full"
+         x-transition:enter-end="translate-x-0"
+         x-transition:leave="transition transform ease-in duration-200"
+         x-transition:leave-start="translate-x-0"
+         x-transition:leave-end="translate-x-full"
+         class="fixed right-0 top-0 h-full w-full lg:w-[820px] bg-panel border-l border-border z-50 overflow-y-auto scroll-thin"
+         style="display: none">
+    <template x-if="selectedMatch">
+      <div class="p-6">
+        <!-- Header -->
+        <div class="flex items-start justify-between mb-5">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="px-2 py-0.5 rounded text-xs font-bold"
+                    :class="selectedMatch.radiant_win ? 'badge-radiant' : 'badge-dire'"
+                    x-text="selectedMatch.radiant_win ? '天辉胜' : '夜魇胜'"></span>
+              <span class="font-mono text-xs text-muted" x-text="'#' + selectedMatch.match_id"></span>
+            </div>
+            <div class="text-2xl font-black">
+              <span class="text-radianthi" x-text="selectedMatch.radiant_score"></span>
+              <span class="text-muted mx-2">:</span>
+              <span class="text-direhi" x-text="selectedMatch.dire_score"></span>
+              <span class="text-sm text-muted font-normal ml-3"
+                    x-text="selectedMatch.duration + ' · ' + selectedMatch.start_time"></span>
+            </div>
+            <div class="text-xs mt-2 flex gap-3">
+              <a :href="selectedMatch.opendota" target="_blank" class="text-muted hover:text-gold">OpenDota ↗</a>
+              <a :href="selectedMatch.dotabuff" target="_blank" class="text-muted hover:text-gold">Dotabuff ↗</a>
+            </div>
+          </div>
+          <button @click="closeMatchDrawer()"
+                  class="text-muted hover:text-white text-3xl leading-none -mt-1">×</button>
+        </div>
+
+        <!-- 颁奖卡片 (6 个) -->
+        <template x-if="matchAwards(selectedMatch)">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mb-6">
+            <template x-for="award in [
+              {icon:'👑', label:'综合 MVP',   player: matchAwards(selectedMatch).mvp,         color:'text-radianthi', sub: (p) => p.kills+'/'+p.deaths+'/'+p.assists+' · '+p.gpm+' GPM'},
+              {icon:'🚀', label:'最 C',        player: matchAwards(selectedMatch).carry,        color:'text-gold',      sub: (p) => Math.round(p.net_worth/1000)+'K净值 · '+Math.round(p.hero_damage/1000)+'K伤害'},
+              {icon:'🛌', label:'躺赢',        player: matchAwards(selectedMatch).carried,      color:'text-muted',     sub: (p) => p.kills+'/'+p.deaths+'/'+p.assists+' · '+p.gpm+' GPM'},
+              {icon:'💔', label:'败方 MVP',    player: matchAwards(selectedMatch).loserMvp,    color:'text-direhi',    sub: (p) => p.kills+'/'+p.deaths+'/'+p.assists+' · '+Math.round(p.hero_damage/1000)+'K伤害'},
+              {icon:'⚔️', label:'最多击杀',    player: matchAwards(selectedMatch).mostKills,   color:'text-gold',      sub: (p) => p.kills+' 击杀'},
+              {icon:'🤝', label:'最多助攻',    player: matchAwards(selectedMatch).mostAssists, color:'text-gold',      sub: (p) => p.assists+' 助攻'},
+            ]" :key="award.label">
+              <div class="bg-panel2 rounded p-3 border-l-2"
+                   :class="award.player.win ? 'border-radiant' : 'border-dire'">
+                <div class="flex items-center gap-2 mb-1.5">
+                  <span class="text-xl" x-text="award.icon"></span>
+                  <span class="text-[11px] text-muted uppercase tracking-wider" x-text="award.label"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <img :src="award.player.hero_icon" :alt="award.player.hero_name"
+                       class="w-8 h-8 rounded shrink-0" />
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-bold truncate" x-text="award.player.name"></div>
+                    <div class="text-[10px] text-muted truncate" x-text="award.player.hero_name"></div>
+                  </div>
+                </div>
+                <div class="text-[11px] mt-1.5" :class="award.color" x-text="award.sub(award.player)"></div>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- 双方阵容表 -->
+        <template x-for="side in [{key:'radiant', label:'天辉 Radiant', color:'text-radianthi', isRad:true}, {key:'dire', label:'夜魇 Dire', color:'text-direhi', isRad:false}]" :key="side.key">
+          <div class="mb-5">
+            <h3 class="font-bold mb-2 flex items-center gap-2" :class="side.color">
+              <span x-text="side.label"></span>
+              <span class="text-xs font-normal text-muted"
+                    x-text="(side.isRad === selectedMatch.radiant_win ? '胜' : '败')"></span>
+            </h3>
+            <div class="overflow-x-auto scroll-thin">
+              <table class="w-full text-xs">
+                <thead class="text-muted">
+                  <tr class="border-b border-border">
+                    <th class="text-left py-1.5 pr-2">英雄</th>
+                    <th class="text-left py-1.5 px-2">玩家</th>
+                    <th class="text-center py-1.5 px-2">Lv</th>
+                    <th class="text-center py-1.5 px-2">K / D / A</th>
+                    <th class="text-right py-1.5 px-2">GPM</th>
+                    <th class="text-right py-1.5 px-2">LH / DN</th>
+                    <th class="text-right py-1.5 px-2">净值</th>
+                    <th class="text-right py-1.5 px-2">伤害</th>
+                    <th class="text-right py-1.5 px-2">推塔</th>
+                    <th class="text-right py-1.5 px-2">治疗</th>
+                    <th class="text-right py-1.5 pl-2">评分</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="p in selectedMatch.players.filter(p => p.is_radiant === side.isRad).sort((a,b) => matchPlayerScore(selectedMatch,b) - matchPlayerScore(selectedMatch,a))" :key="p.account_id + '_' + p.hero_id">
+                    <tr class="border-b border-border/40 hover:bg-panel2/50">
+                      <td class="py-1.5 pr-2">
+                        <img :src="p.hero_icon" :alt="p.hero_name" :title="p.hero_name" class="w-8 h-8 rounded" />
+                      </td>
+                      <td class="py-1.5 px-2">
+                        <div class="font-bold truncate max-w-[140px]" x-text="p.name"
+                             :class="p.account_id ? 'cursor-pointer hover:text-gold' : ''"
+                             @click="p.account_id && data.players.find(pp => pp.account_id === p.account_id) && (drawerPlayer = data.players.find(pp => pp.account_id === p.account_id), selectedMatch = null)"></div>
+                      </td>
+                      <td class="text-center font-mono" x-text="p.level"></td>
+                      <td class="text-center font-mono">
+                        <span class="text-radianthi" x-text="p.kills"></span>/<span
+                              class="text-direhi" x-text="p.deaths"></span>/<span
+                              class="text-gold" x-text="p.assists"></span>
+                      </td>
+                      <td class="text-right font-mono" x-text="p.gpm"></td>
+                      <td class="text-right font-mono text-muted" x-text="p.last_hits + '/' + p.denies"></td>
+                      <td class="text-right font-mono" x-text="(p.net_worth/1000).toFixed(1)+'K'"></td>
+                      <td class="text-right font-mono" x-text="(p.hero_damage/1000).toFixed(1)+'K'"></td>
+                      <td class="text-right font-mono text-muted" x-text="p.tower_damage"></td>
+                      <td class="text-right font-mono text-muted" x-text="p.hero_healing"></td>
+                      <td class="text-right font-mono font-bold gold-text"
+                          x-text="matchPlayerScore(selectedMatch, p)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+  </aside>
+</div>
+
+<script>
+function dashboard() {
+  return {
+    data: null,
+    loading: false,
+    error: null,
+    updatedAt: null,
+    progress: {phase:'idle', current:0, total:0, message:''},
+
+    tab: 'players',
+    tabLabels: {players:'玩家排行', heroes:'英雄数据', matches:'对局列表'},
+    get tabCounts() {
+      return {
+        players: this.data?.players?.length || 0,
+        heroes: this.data?.heroes?.length || 0,
+        matches: this.data?.matches?.length || 0,
+      };
+    },
+
+    playerQuery: '', playerQueryDraft: '', playerPage: 1,
+    playerSort: 'matches', playerSortDir: 'desc',
+    heroQuery: '', heroQueryDraft: '', heroPage: 1,
+    heroSort: 'picks', heroSortDir: 'desc',
+    matchQuery: '', matchQueryDraft: '',
+    matchWinFilter: 'all',
+    matchPage: 1,
+    pageSize: 25,
+
+    durationChart: null,
+    trendChart: null,
+    paceChart: null,
+    heroScatter: null,
+    _heroByName: {},
+
+    drawerPlayer: null,
+    selectedMatch: null,
+
+    _matchFromUrl: false,
+    _playerFromUrl: false,
+
+    async init() {
+      await this.fetchStats();
+      this._pollProgress();
+      // 从 URL 参数自动打开抽屉
+      const params = new URLSearchParams(window.location.search);
+      const urlPid = params.get('p');
+      const urlMid = params.get('m');
+      if (urlPid && this.data?.players?.length) {
+        const target = this.data.players.find(pp => String(pp.account_id) === String(urlPid));
+        if (target) { this.drawerPlayer = target; this._playerFromUrl = true; }
+      }
+      if (urlMid && this.data?.matches?.length) {
+        const target = this.data.matches.find(mm => String(mm.match_id) === String(urlMid));
+        if (target) {
+          this.selectedMatch = target;
+          this._matchFromUrl = true;
+          this.tab = 'matches';  // 切到对局列表 tab，背景上下文匹配
+        }
+      }
+    },
+
+    closeMatchDrawer() {
+      // 如果是从外面（个人页）跳过来的，关闭时回退到来源页
+      if (this._matchFromUrl && window.history.length > 1) {
+        window.history.back();
+      } else {
+        this.selectedMatch = null;
+      }
+    },
+
+    closePlayerDrawer() {
+      if (this._playerFromUrl && window.history.length > 1) {
+        window.history.back();
+      } else {
+        this.drawerPlayer = null;
+      }
+    },
+
+    async fetchStats() {
+      const r = await fetch('/api/stats');
+      const j = await r.json();
+      this.data = j.data;
+      this.updatedAt = j.updated_at;
+      this.loading = j.loading;
+      this.error = j.error;
+      if (this.data) {
+        this._heroByName = Object.fromEntries(this.data.heroes.map(h => [h.name, h.icon]));
+        this._enrichPlayers();
+        this._computeRankChanges();
+        // 等 Alpine 把 x-show 翻成可见 + 浏览器跑完 layout 再画图
+        this.$nextTick(() => {
+          requestAnimationFrame(() => this.drawCharts());
+        });
+      }
+    },
+
+    // 单场玩家综合分（实力榜 + 对局详情 MVP 都用这一把尺）
+    //
+    // v4：carry / support 平衡版（在 v2 carry 偏重 / v3 support 偏重之间取中间值）
+    //   - 击杀 ×1.7（v2=1.5, v3=1.5）   ← carry 主要输出，略提
+    //   - 助攻 ×2.0（v2=1.2, v3=2.5）   ← support 主要贡献，保留较高权重
+    //   - 死亡 ×0.5                     ← 不变
+    //   - 英雄伤害 /100（v2=100, v3=110）← 回到 v2，carry 友好
+    //   - 推塔 /45 （v2=50,  v3=40）    ← 中间值
+    //   - 治疗 /80 （v2=150, v3=60）    ← 中间，奶妈仍有不错奖励
+    //   - GPM ×1.2 （v2=1.2, v3=1.0）   ← 回到 v2，carry 友好
+    //   - XPM ×0.8 （v2=0.8, v3=0.7）   ← 回到 v2
+    //   - 补刀 ×0.2（v2=0.25, v3=0.15）  ← 中间值
+    //   - 反补 ×2.5（v2=1.8, v3=3）     ← 中间，support 对线信号
+    //   - 净值 /900（v2=800, v3=1200）  ← 中间偏 carry
+    //   - 等级 ×2.8（v2=3,   v3=2.5）   ← 中间
+    //   - 胜场 +100（v2=80,  v3=100）   ← 保留 v3
+    _perMatchScore(p) {
+      return (p.kills * 1.7 + p.assists * 2.0 - p.deaths * 0.5) * 80
+           + (p.hero_damage   || 0) / 100
+           + (p.tower_damage  || 0) / 45
+           + (p.hero_healing  || 0) / 80
+           + (p.gpm           || 0) * 1.2
+           + (p.xpm           || 0) * 0.8
+           + (p.last_hits     || 0) * 0.2
+           + (p.denies        || 0) * 2.5
+           + (p.net_worth     || 0) / 900
+           + (p.level         || 0) * 2.8
+           + (p.win ? 100 : 0);
+    },
+
+    // 跟"昨天"对比 skill_score 排名变化（用 localStorage 保存每日快照）
+    _computeRankChanges() {
+      if (!this.data?.players?.length) return;
+      const STORAGE_KEY = 'dota-stats-snapshot-' + (this.data.league_id || 0);
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+      // 算今天的 rank（按 skill_score 排，只算 ≥15 场的玩家）
+      const ranked = this.data.players
+        .filter(p => p.matches >= 15 && p.skill_score)
+        .sort((a, b) => b.skill_score - a.skill_score);
+      const currentRanks = {};
+      ranked.forEach((p, i) => {
+        currentRanks[p.account_id] = { rank: i + 1, score: p.skill_score };
+      });
+
+      // 读历史快照
+      let snap;
+      try { snap = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+      catch (e) { snap = {}; }
+
+      // 跨日切换：把"今日"挤成"昨日"
+      if (snap.today_date && snap.today_date !== today) {
+        snap.yesterday_date = snap.today_date;
+        snap.yesterday_ranks = snap.today_ranks;
+      }
+      // 当天第一次打开 → 把当前状态固化成今日快照（之后同日多次刷新不会变）
+      if (snap.today_date !== today) {
+        snap.today_date = today;
+        snap.today_ranks = currentRanks;
+      }
+
+      // 给每个玩家算 vs 昨日的变化
+      const yest = snap.yesterday_ranks || {};
+      for (const p of this.data.players) {
+        const cur = currentRanks[p.account_id];
+        const old = yest[p.account_id];
+        if (!cur) {
+          p.rank_change_label = null;        // 没上榜（<15 场），不显示
+        } else if (!old) {
+          p.rank_change_label = '★NEW';      // 昨天没数据，新上榜
+          p.rank_change_color = 'text-gold';
+        } else if (cur.rank < old.rank) {
+          p.rank_change_label = '↑' + (old.rank - cur.rank);
+          p.rank_change_color = 'text-radianthi';
+        } else if (cur.rank > old.rank) {
+          p.rank_change_label = '↓' + (cur.rank - old.rank);
+          p.rank_change_color = 'text-direhi';
+        } else {
+          p.rank_change_label = '—';
+          p.rank_change_color = 'text-muted';
+        }
+        p.score_change_1d = (cur && old) ? cur.score - old.score : null;
+      }
+
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(snap)); }
+      catch (e) { /* localStorage 满了或被禁用都不致命 */ }
+    },
+
+    _enrichPlayers() {
+      // 从 matches.players 里算每个玩家的实力分 + 几个 backend 没给的平均值
+      if (!this.data?.players?.length || !this.data?.matches?.length) return;
+      const tot = {};
+      for (const m of this.data.matches) {
+        for (const p of m.players || []) {
+          if (!p.account_id) continue;
+          if (!tot[p.account_id]) tot[p.account_id] = { s:0, gpm:0, hd:0, td:0, heal:0, dn:0, nw:0, xpm:0, n:0 };
+          const t = tot[p.account_id];
+          t.s += this._perMatchScore(p);
+          t.gpm  += p.gpm           || 0;
+          t.xpm  += p.xpm           || 0;
+          t.hd   += p.hero_damage   || 0;
+          t.td   += p.tower_damage  || 0;
+          t.heal += p.hero_healing  || 0;
+          t.dn   += p.denies        || 0;
+          t.nw   += p.net_worth     || 0;
+          t.n++;
+        }
+      }
+      for (const p of this.data.players) {
+        const t = tot[p.account_id];
+        if (t && t.n) {
+          p.skill_score        = Math.round(t.s   / t.n);
+          p.avg_gpm            = Math.round(t.gpm / t.n);
+          p.avg_xpm            = Math.round(t.xpm / t.n);
+          p.avg_hero_damage    = Math.round(t.hd  / t.n);
+          p.avg_tower_damage   = Math.round(t.td  / t.n);
+          p.avg_hero_healing   = Math.round(t.heal/ t.n);
+          p.avg_denies         = Math.round(t.dn  / t.n * 10) / 10;
+          p.avg_net_worth      = Math.round(t.nw  / t.n);
+        } else {
+          p.skill_score = 0;
+        }
+      }
+    },
+
+    async _pollProgress() {
+      while (true) {
+        await new Promise(r => setTimeout(r, 1000));
+        if (!this.loading) continue;
+        try {
+          const r = await fetch('/api/progress');
+          const j = await r.json();
+          this.progress = j.progress;
+          if (!j.loading) {
+            await this.fetchStats();
+          }
+        } catch (e) { /* ignore */ }
+      }
+    },
+
+    async refresh() {
+      // 重新加载服务器磁盘上的 aggregate.json 进内存
+      // （配合本地 sync.bat 推完数据使用，不会去 Steam 拉新比赛）
+      if (this.loading) return;
+      this.error = null;
+      try {
+        const r = await fetch('/api/reload-cache', {method:'POST'});
+        const j = await r.json();
+        if (j.ok) {
+          await this.fetchStats();
+        } else {
+          this.error = j.message || '重新加载失败';
+        }
+      } catch (e) {
+        this.error = '请求失败：' + e;
+      }
+    },
+
+    kpis() {
+      if (!this.data) return [];
+      const s = this.data.summary;
+      return [
+        {label:'总对局', value:s.total_matches, sub:`${s.heroes_played} 个英雄登场`},
+        {label:'天辉胜率', value:s.radiant_winrate+'%', sub:`${s.radiant_wins} 胜 / ${s.dire_wins} 负`,
+         color: s.radiant_winrate >= 50 ? 'text-radianthi' : 'text-direhi'},
+        {label:'平均时长', value:s.avg_duration, sub:'mm:ss'},
+        {label:'活跃玩家', value:s.active_players, sub:'已登记 account_id'},
+        {label:'场均击杀', value:s.avg_kills_per_match, sub:`总 ${s.total_kills} 击杀`},
+      ];
+    },
+
+    teamHighlights() {
+      if (!this.data?.matches?.length) return [];
+      const ms = this.data.matches;
+      const by = (fn) => ms.reduce((a, b) => fn(b) > fn(a) ? b : a);
+      const longest      = by(m => m.duration_sec);
+      const shortest     = ms.reduce((a, b) => b.duration_sec < a.duration_sec ? b : a);
+      const mostKills    = by(m => m.radiant_score + m.dire_score);
+      const biggestDiff  = by(m => Math.abs(m.radiant_score - m.dire_score));
+      const latest       = by(m => m.start_ts);
+      const fmtSide = (m) => m.radiant_win ? '天辉胜' : '夜魇胜';
+      return [
+        {icon:'🆕', label:'最近一场', value: latest.start_time,
+         sub: `${latest.radiant_score}-${latest.dire_score} · ${fmtSide(latest)}`, url: latest.opendota},
+        {icon:'🔥', label:'最长一场', value: longest.duration,
+         sub: `${longest.radiant_score}-${longest.dire_score} · ${fmtSide(longest)}`, url: longest.opendota},
+        {icon:'⚡', label:'最短一场', value: shortest.duration,
+         sub: `${shortest.radiant_score}-${shortest.dire_score} · ${fmtSide(shortest)}`, url: shortest.opendota},
+        {icon:'💀', label:'单场最高击杀', value: (mostKills.radiant_score + mostKills.dire_score) + ' 击杀',
+         sub: `${mostKills.radiant_score}-${mostKills.dire_score} · ${mostKills.duration}`, url: mostKills.opendota},
+        {icon:'📊', label:'最大分差', value: Math.abs(biggestDiff.radiant_score - biggestDiff.dire_score) + ' 分',
+         sub: `${biggestDiff.radiant_score}-${biggestDiff.dire_score} · ${fmtSide(biggestDiff)}`, url: biggestDiff.opendota},
+      ];
+    },
+
+    _awardsFromPlayers(ps, minHi, minLo, subSuffix) {
+      const pickMax = (filter, key) => {
+        const f = filter ? ps.filter(filter) : ps;
+        if (!f.length) return null;
+        return f.reduce((a, b) => (b[key] > a[key] ? b : a));
+      };
+      const fHi = (p) => p.matches >= minHi;
+      const fLo = (p) => p.matches >= minLo;
+      const defs = [
+        {icon:'👑', label:'杀人之王',   key:'avg_kills',   filter:fLo,  suffix:'',    sub:`场均击杀 · ≥${minLo}场${subSuffix}`},
+        {icon:'🦸', label:'助攻大师',   key:'avg_assists', filter:fLo,  suffix:'',    sub:`场均助攻 · ≥${minLo}场${subSuffix}`},
+        {icon:'💀', label:'自助餐之王', key:'avg_deaths',  filter:fLo,  suffix:'',    sub:`场均死亡 · ≥${minLo}场${subSuffix}`},
+        {icon:'🎯', label:'KDA 之神',   key:'kda',         filter:fHi,  suffix:'',    sub:`KDA · ≥${minHi}场${subSuffix}`},
+        {icon:'🍀', label:'胜利锦鲤',   key:'winrate',     filter:fHi,  suffix:'%',   sub:`胜率 · ≥${minHi}场${subSuffix}`},
+        {icon:'🛡️', label:'常驻老兵',   key:'matches',     filter:null, suffix:'场',  sub:`出战场次${subSuffix}`},
+      ];
+      return defs.map(d => {
+        const p = pickMax(d.filter, d.key);
+        return { ...d, player: p, value: p ? (p[d.key] + d.suffix) : '—' };
+      });
+    },
+
+    teamAwards() {
+      if (!this.data?.players?.length) return [];
+      return this._awardsFromPlayers(this.data.players, 10, 5, '');
+    },
+
+    // 近 N 天的玩家聚合（基于 match.players）
+    recentPlayerStats(days = 14) {
+      if (!this.data?.matches?.length) return { players: [], matchCount: 0 };
+      const cutoff = Date.now() / 1000 - days * 86400;
+      const map = {};
+      let matchCount = 0;
+      for (const m of this.data.matches) {
+        if (m.start_ts < cutoff) continue;
+        if (!m.players?.length) continue;
+        matchCount++;
+        for (const p of m.players) {
+          if (!p.account_id) continue;
+          const k = p.account_id;
+          if (!map[k]) {
+            map[k] = {
+              account_id: p.account_id, name: p.name,
+              matches: 0, wins: 0, kills: 0, deaths: 0, assists: 0,
+            };
+          }
+          const r = map[k];
+          r.matches++;
+          if (p.win) r.wins++;
+          r.kills += p.kills;
+          r.deaths += p.deaths;
+          r.assists += p.assists;
+        }
+      }
+      const players = Object.values(map).map(p => ({
+        ...p,
+        losses: p.matches - p.wins,
+        winrate: p.matches ? Math.round(p.wins / p.matches * 1000) / 10 : 0,
+        kda: Math.round((p.kills + p.assists) / Math.max(p.deaths, 1) * 100) / 100,
+        avg_kills:   p.matches ? Math.round(p.kills / p.matches * 10) / 10 : 0,
+        avg_deaths:  p.matches ? Math.round(p.deaths / p.matches * 10) / 10 : 0,
+        avg_assists: p.matches ? Math.round(p.assists / p.matches * 10) / 10 : 0,
+      }));
+      return { players, matchCount };
+    },
+
+    teamAwardsRecent() {
+      const { players } = this.recentPlayerStats(7);
+      if (!players.length) return [];
+      return this._awardsFromPlayers(players, 5, 5, '');
+    },
+
+    recentMatchCount() {
+      return this.recentPlayerStats(7).matchCount;
+    },
+
+    openPlayerDrawer(accountId) {
+      if (!accountId) return;
+      const full = this.data?.players?.find(pp => pp.account_id === accountId);
+      if (full) this.drawerPlayer = full;
+    },
+
+    showPlayerMatches(player) {
+      if (!player) return;
+      const q = player.name || String(player.account_id);
+      this.matchQueryDraft = q;
+      this.matchQuery = q;
+      this.matchWinFilter = 'all';
+      this.matchPage = 1;
+      this.tab = 'matches';
+      this.drawerPlayer = null;
+      this.selectedMatch = null;
+      // 滚动到 tabs 区域，让用户直接看到搜索框 + 结果列表
+      this.$nextTick(() => {
+        document.getElementById('tabs-nav')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      });
+    },
+
+    formatUpdate(ts) {
+      if (!ts) return '';
+      const d = new Date(ts*1000);
+      return d.toLocaleString('zh-CN', {hour12:false});
+    },
+
+    heroIconByName(name) {
+      return this._heroByName[name] || '';
+    },
+
+    // 模糊匹配：needle 的字符按顺序在 haystack 里出现就算命中
+    // （比如 "sf" 匹配 "Shadow Fiend"）
+    fuzzyMatch(needle, haystack) {
+      if (!needle) return true;
+      const n = String(needle).toLowerCase();
+      const h = String(haystack || '').toLowerCase();
+      if (h.includes(n)) return true;   // 子串命中优先
+      let i = 0;
+      for (const c of h) {
+        if (c === n[i]) i++;
+        if (i === n.length) return true;
+      }
+      return false;
+    },
+
+    commitSearch(which) {
+      if (which === 'player')  { this.playerQuery = this.playerQueryDraft; this.playerPage = 1; }
+      if (which === 'hero')    { this.heroQuery   = this.heroQueryDraft;   this.heroPage = 1; }
+      if (which === 'match')   { this.matchQuery  = this.matchQueryDraft;  this.matchPage = 1; }
+    },
+
+    clearSearchIfEmpty(which) {
+      // 输入框清空时立即生效，不用回车
+      if (which === 'player' && !this.playerQueryDraft) { this.playerQuery = ''; this.playerPage = 1; }
+      if (which === 'hero'   && !this.heroQueryDraft)   { this.heroQuery   = ''; this.heroPage   = 1; }
+      if (which === 'match'  && !this.matchQueryDraft)  { this.matchQuery  = ''; this.matchPage  = 1; }
+    },
+
+    // 分页工具
+    pagedSlice(items, page, size) {
+      if (!items?.length) return [];
+      const pages = Math.max(1, Math.ceil(items.length / size));
+      const p = Math.max(1, Math.min(page, pages));
+      const start = (p - 1) * size;
+      return items.slice(start, start + size);
+    },
+    pageCount(total, size) {
+      return Math.max(1, Math.ceil((total || 0) / size));
+    },
+    goPage(which, delta) {
+      let total;
+      if (which === 'player') total = this.filteredPlayers().length;
+      else if (which === 'hero') total = this.filteredHeroes().length;
+      else total = this.filteredMatches().length;
+      const pages = this.pageCount(total, this.pageSize);
+      const cur = which === 'player' ? this.playerPage : which === 'hero' ? this.heroPage : this.matchPage;
+      const next = Math.max(1, Math.min(cur + delta, pages));
+      if (which === 'player') this.playerPage = next;
+      else if (which === 'hero') this.heroPage = next;
+      else this.matchPage = next;
+      // 切页时滚到 tabs 顶端，避免用户在表中间看到"切换瞬间内容跳变"
+      this.$nextTick(() => {
+        document.getElementById('tabs-nav')?.scrollIntoView({behavior: 'smooth', block: 'start'});
+      });
+    },
+
+    // 单场比赛颁奖
+    matchAwards(match) {
+      if (!match?.players?.length) return null;
+      // 综合表现分：跟玩家榜实力分用同一公式（11 个维度）
+      const score = (p) => this._perMatchScore(p);
+      // 最C分：净值 + 英雄伤害（carry 特征）
+      const cScore = (p) => p.net_worth / 1000 + p.hero_damage / 100;
+      const winners = match.players.filter(p => p.win);
+      const losers  = match.players.filter(p => !p.win);
+      const maxBy = (arr, fn) => arr.reduce((a, b) => fn(b) > fn(a) ? b : a);
+      const minBy = (arr, fn) => arr.reduce((a, b) => fn(b) < fn(a) ? b : a);
+      if (!winners.length || !losers.length) return null;
+      return {
+        mvp:         maxBy(winners, score),
+        loserMvp:    maxBy(losers, score),
+        carry:       maxBy(winners, cScore),
+        carried:     minBy(winners, score),
+        mostKills:   maxBy(match.players, p => p.kills),
+        mostAssists: maxBy(match.players, p => p.assists),
+        // 每个玩家算分，方便表里显示评分
+        scores: Object.fromEntries(match.players.map(p => [
+          p.account_id + '_' + p.hero_id, Math.round(score(p)),
+        ])),
+      };
+    },
+
+    matchPlayerScore(match, p) {
+      const a = this.matchAwards(match);
+      if (!a) return 0;
+      return a.scores[p.account_id + '_' + p.hero_id] || 0;
+    },
+
+    // ---- sorting ----
+    sortPlayers(col) {
+      if (this.playerSort === col) this.playerSortDir = this.playerSortDir==='desc'?'asc':'desc';
+      else { this.playerSort = col; this.playerSortDir = 'desc'; }
+      this.playerPage = 1;
+    },
+    sortHeroes(col) {
+      if (this.heroSort === col) this.heroSortDir = this.heroSortDir==='desc'?'asc':'desc';
+      else { this.heroSort = col; this.heroSortDir = 'desc'; }
+      this.heroPage = 1;
+    },
+
+    filteredPlayers() {
+      if (!this.data) return [];
+      const q = this.playerQuery.trim();
+      let rows = this.data.players;
+      if (q) rows = rows.filter(p =>
+        this.fuzzyMatch(q, p.name) || String(p.account_id).includes(q));
+      const dir = this.playerSortDir==='desc' ? -1 : 1;
+      return [...rows].sort((a,b) => {
+        const va = a[this.playerSort], vb = b[this.playerSort];
+        if (typeof va === 'string') return dir * va.localeCompare(vb);
+        return dir * (va - vb);
+      });
+    },
+    filteredHeroes() {
+      if (!this.data) return [];
+      const q = this.heroQuery.trim();
+      let rows = this.data.heroes;
+      if (q) rows = rows.filter(h => this.fuzzyMatch(q, h.name));
+      const dir = this.heroSortDir==='desc' ? -1 : 1;
+      return [...rows].sort((a,b) => {
+        const va = a[this.heroSort], vb = b[this.heroSort];
+        if (typeof va === 'string') return dir * va.localeCompare(vb);
+        return dir * (va - vb);
+      });
+    },
+    filteredMatches() {
+      if (!this.data) return [];
+      const q = this.matchQuery.trim();
+      if (!q && this.matchWinFilter === 'all') return this.data.matches;
+      const qLower = q.toLowerCase();
+      return this.data.matches.filter(m => {
+        if (this.matchWinFilter === 'radiant' && !m.radiant_win) return false;
+        if (this.matchWinFilter === 'dire' && m.radiant_win) return false;
+        if (!q) return true;
+        // 对局列表全部用子串精确匹配 —— fuzzy 在 10 英雄 + 10 玩家拼出的长串里太容易乱命中
+        if (String(m.match_id).includes(q)) return true;
+        const heroes = [...m.radiant_players, ...m.dire_players].join(' ').toLowerCase();
+        if (heroes.includes(qLower)) return true;
+        for (const p of m.players || []) {
+          if (p.account_id && String(p.account_id).includes(q)) return true;
+          if (p.name && p.name.toLowerCase().includes(qLower)) return true;
+        }
+        return false;
+      });
+    },
+    visibleMatchCount() { return this.filteredMatches().length; },
+
+    // ---- charts data ----
+    durationBuckets() {
+      const labels = ['< 25 分', '25–35 分', '35–45 分', '45+ 分'];
+      const counts = [0, 0, 0, 0];
+      for (const m of this.data?.matches || []) {
+        const mins = m.duration_sec / 60;
+        if (mins < 25) counts[0]++;
+        else if (mins < 35) counts[1]++;
+        else if (mins < 45) counts[2]++;
+        else counts[3]++;
+      }
+      return { labels, counts };
+    },
+
+    heatmapRows() {
+      const grid = Array.from({length: 7}, () => Array(24).fill(0));
+      for (const m of this.data?.matches || []) {
+        const d = new Date(m.start_ts * 1000);
+        const day = (d.getDay() + 6) % 7;   // 周一=0, 周日=6
+        grid[day][d.getHours()]++;
+      }
+      const max = Math.max(1, ...grid.flat());
+      const days = ['周一','周二','周三','周四','周五','周六','周日'];
+      return grid.map((row, day) => ({
+        day, dayLabel: days[day],
+        cells: row.map((count, hour) => ({
+          hour, count,
+          alpha: count === 0 ? 0.04 : 0.15 + 0.85 * count / max,
+        })),
+      }));
+    },
+
+    weeklyTrend() {
+      // 按周一为周首分桶，返回最近 12 周
+      const buckets = {};
+      for (const m of this.data?.matches || []) {
+        const d = new Date(m.start_ts * 1000);
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+        monday.setHours(0, 0, 0, 0);
+        const key = monday.toISOString().slice(0, 10);
+        buckets[key] = (buckets[key] || 0) + 1;
+      }
+      const sorted = Object.entries(buckets).sort();
+      const recent = sorted.slice(-12);
+      return {
+        labels: recent.map(([k]) => k.slice(5)),  // MM-DD
+        counts: recent.map(([, v]) => v),
+      };
+    },
+
+    paceBuckets() {
+      // 按双方得分差距分桶
+      const labels = ['焦灼 ≤10', '正常 10-20', '拉锯 20-30', '一边倒 30+'];
+      const counts = [0, 0, 0, 0];
+      for (const m of this.data?.matches || []) {
+        const diff = Math.abs(m.radiant_score - m.dire_score);
+        if (diff <= 10) counts[0]++;
+        else if (diff <= 20) counts[1]++;
+        else if (diff <= 30) counts[2]++;
+        else counts[3]++;
+      }
+      return { labels, counts };
+    },
+
+    heroScatterData() {
+      // 散点图：x=出场, y=胜率%。按出场数过滤 ≥3 场，避免一两场打偏胜率
+      const pts = (this.data?.heroes || []).filter(h => h.picks >= 3);
+      return pts.map(h => ({
+        x: h.picks,
+        y: h.winrate,
+        name: h.name,
+        icon: h.icon,
+        wins: h.wins,
+        losses: h.losses,
+      }));
+    },
+
+    // ---- charts ----
+    drawCharts() {
+      if (this.durationChart) this.durationChart.destroy();
+      if (this.trendChart) this.trendChart.destroy();
+      if (this.paceChart) this.paceChart.destroy();
+      if (this.heroScatter) this.heroScatter.destroy();
+
+      // 对局时长直方图
+      const db = this.durationBuckets();
+      const ctx1 = document.getElementById('durationChart');
+      if (ctx1) {
+        this.durationChart = new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: db.labels,
+            datasets: [{
+              label: '场次',
+              data: db.counts,
+              backgroundColor: ['#3b82f6', '#92a629', '#c8aa6e', '#c23c2a'],
+              borderRadius: 6,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: false,
+            scales: {
+              x: { ticks:{color:'#e8eaed'}, grid:{display:false} },
+              y: { ticks:{color:'#7a8499', stepSize:1}, grid:{color:'#2a3148'}, beginAtZero:true },
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (c) => `${c.parsed.y} 场` } },
+            }
+          }
+        });
+      }
+
+      // 每周对局数（柱状）
+      const wt = this.weeklyTrend();
+      const ctx2 = document.getElementById('trendChart');
+      if (ctx2) {
+        this.trendChart = new Chart(ctx2, {
+          type: 'bar',
+          data: {
+            labels: wt.labels,
+            datasets: [{
+              label: '场次',
+              data: wt.counts,
+              backgroundColor: '#c8aa6e',
+              hoverBackgroundColor: '#f0d486',
+              borderRadius: 4,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: false,
+            scales: {
+              x: { ticks:{color:'#7a8499', font:{size:10}}, grid:{display:false} },
+              y: { ticks:{color:'#7a8499', stepSize:1}, grid:{color:'#2a3148'}, beginAtZero:true },
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (c) => `${c.parsed.y} 场` } },
+            }
+          }
+        });
+      }
+
+      // 比赛节奏（按分差分桶）
+      const pb = this.paceBuckets();
+      const ctx3 = document.getElementById('paceChart');
+      if (ctx3) {
+        this.paceChart = new Chart(ctx3, {
+          type: 'bar',
+          data: {
+            labels: pb.labels,
+            datasets: [{
+              label: '场次',
+              data: pb.counts,
+              backgroundColor: ['#e85a45', '#c8aa6e', '#92a629', '#3b82f6'],
+              borderRadius: 6,
+            }]
+          },
+          options: {
+            indexAxis: 'y',
+            responsive: true, maintainAspectRatio: false,
+            animation: false,
+            scales: {
+              x: { ticks:{color:'#7a8499', stepSize:1}, grid:{color:'#2a3148'}, beginAtZero:true },
+              y: { ticks:{color:'#e8eaed', font:{size:12}}, grid:{display:false} },
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (c) => {
+                    const total = pb.counts.reduce((a,b) => a+b, 0);
+                    const pct = total ? ((c.parsed.x / total) * 100).toFixed(1) : 0;
+                    return `${c.parsed.x} 场 (${pct}%)`;
+                  }
+                }
+              },
+            }
+          }
+        });
+      }
+
+      // 英雄热度 × 胜率散点图
+      const scatter = this.heroScatterData();
+      const ctx4 = document.getElementById('heroScatter');
+      if (ctx4) {
+        this.heroScatter = new Chart(ctx4, {
+          type: 'scatter',
+          data: {
+            datasets: [{
+              label: '英雄',
+              data: scatter,
+              backgroundColor: (c) => {
+                const p = c.raw;
+                if (!p) return '#7a8499';
+                // 右上=真本命(绿), 右下=烫手(红), 左上=冷门高手(金), 左下=路人(灰)
+                const hi = p.y >= 50;
+                const hot = p.x >= 8;
+                if (hi && hot)  return '#92a629';
+                if (!hi && hot) return '#c23c2a';
+                if (hi && !hot) return '#c8aa6e';
+                return '#7a8499';
+              },
+              pointRadius: (c) => 4 + Math.min(10, (c.raw?.x || 0) * 0.4),
+              pointHoverRadius: (c) => 6 + Math.min(12, (c.raw?.x || 0) * 0.4),
+              borderColor: '#0a0e1a',
+              borderWidth: 1,
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: false,
+            scales: {
+              x: {
+                title: { display: true, text: '出场次数', color: '#7a8499', font:{size:11} },
+                ticks: { color:'#7a8499' }, grid: { color:'#2a3148' }, beginAtZero: true,
+              },
+              y: {
+                title: { display: true, text: '胜率 %', color: '#7a8499', font:{size:11} },
+                ticks: { color:'#7a8499', callback: (v) => v + '%' },
+                grid: { color:'#2a3148' },
+                min: 0, max: 100,
+              },
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  title: (items) => items[0]?.raw?.name || '',
+                  label: (c) => {
+                    const p = c.raw;
+                    return `${p.x} 场 · 胜率 ${p.y}% (${p.wins} 胜 / ${p.losses} 负)`;
+                  }
+                }
+              },
+            }
+          }
+        });
+      }
+
+      // 兜底：布局尘埃落定后再 resize 一次。
+      setTimeout(() => {
+        this.durationChart?.resize();
+        this.trendChart?.resize();
+        this.paceChart?.resize();
+        this.heroScatter?.resize();
+      }, 300);
+    },
+  }
+}
+</script>
+
+</body>
+</html>

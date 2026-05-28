@@ -1,0 +1,29 @@
+# 部署用：在服务器上执行 `docker compose up -d` 即可
+#
+# 启动前在同目录创建 .env 文件填入秘密变量（见 .env.example）
+
+services:
+  dota-stats:
+    build: .
+    image: dota-inhouse-stats:latest
+    container_name: dota-stats
+    restart: unless-stopped
+    ports:
+      # 80 端口给最终用户访问；运营商对家用宽带 80 端口有限制，
+      # 服务器场景没问题。如果你想用其他端口改这里左半边即可。
+      - "80:8000"
+    environment:
+      LEAGUE_ID: "${LEAGUE_ID}"
+      STEAM_API_KEY: "${STEAM_API_KEY}"
+      OPENDOTA_API_KEY: "${OPENDOTA_API_KEY:-}"
+      RATE_LIMIT_PER_MINUTE: "${RATE_LIMIT_PER_MINUTE:-55}"
+      TZ: "Asia/Shanghai"
+    volumes:
+      # 持久化比赛详情缓存和聚合结果，重启不丢
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/progress', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

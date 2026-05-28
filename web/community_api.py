@@ -230,6 +230,9 @@ def api_highlight_quota():
         "cap_mb": HIGHLIGHT_TOTAL_CAP // _MB,
         "free_mb": round(_free_disk(HIGHLIGHT_DIR) / _MB, 1),
         "allowed_exts": sorted(ALLOWED_VIDEO_EXTS),
+        # 诊断用：运行中的服务到底有没有探测到 ffmpeg、用的是哪个二进制
+        "ffmpeg": transcode.has_ffmpeg(),
+        "ffmpeg_bin": shutil.which(transcode.FFMPEG_BIN),
     })
 
 
@@ -312,6 +315,25 @@ def api_delete_highlight(highlight_id):
         (HIGHLIGHT_DIR / Path(filename).name).unlink(missing_ok=True)
     except Exception:
         pass
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/highlights/<int:highlight_id>/retranscode", methods=["POST"])
+def api_retranscode_highlight(highlight_id):
+    """对已上传的集锦重新转码（修复历史上的 HEVC 文件 / 转码失败的）。仅上传者本人。"""
+    err = auth.require_login()
+    if err:
+        return err
+    aid, _ = auth.current_user()
+    hl = db.get_highlight(highlight_id)
+    if not hl:
+        return jsonify({"error": "找不到该集锦"}), 404
+    if hl.get("created_by") != aid:
+        return jsonify({"error": "只有上传者本人能重新转码"}), 403
+    if not transcode.has_ffmpeg():
+        return jsonify({"error": "服务器未检测到 ffmpeg，无法转码"}), 503
+    db.set_highlight_status(highlight_id, "processing")
+    transcode.submit(highlight_id)
     return jsonify({"ok": True})
 
 

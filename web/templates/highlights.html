@@ -92,6 +92,9 @@
       磁盘剩余 <span x-text="(quota.free_mb/1024).toFixed(1)"></span> GB ·
       支持 <span x-text="(quota.allowed_exts||[]).join('/')"></span>
     </p>
+    <p class="text-xs text-direhi mb-3" x-show="quota && quota.ffmpeg === false">
+      ⚠️ 服务器未检测到 ffmpeg：手机/录屏常见的 H.265 视频无法自动转码，会出现"只有声音没画面"。请在服务器安装 ffmpeg。
+    </p>
 
     <!-- 进度条 -->
     <div x-show="busy" class="mb-3">
@@ -135,9 +138,13 @@
               <span x-show="h.size_bytes" x-text="`${(h.size_bytes/1048576).toFixed(1)} MB`"></span>
             </div>
           </div>
-          <button x-show="user.logged_in && user.account_id === h.created_by"
-                  @click="remove(h.id)"
-                  class="text-direhi/60 hover:text-direhi text-sm">删除</button>
+          <div class="flex items-center gap-3 shrink-0"
+               x-show="user.logged_in && user.account_id === h.created_by">
+            <button x-show="h.status !== 'processing'" @click="retranscode(h.id)"
+                    class="text-gold/70 hover:text-gold text-sm">重新转码</button>
+            <button @click="remove(h.id)"
+                    class="text-direhi/60 hover:text-direhi text-sm">删除</button>
+          </div>
         </div>
 
         <p x-show="h.description" class="text-sm text-muted mb-3 whitespace-pre-wrap" x-text="h.description"></p>
@@ -271,6 +278,20 @@ function highlights() {
       };
       xhr.onerror = () => { this.busy = false; this.msg = '✗ 网络错误'; };
       xhr.send(fd);
+    },
+
+    async retranscode(id) {
+      try {
+        const r = await fetch(`/api/highlights/${id}/retranscode`, {method: 'POST'});
+        const j = await r.json();
+        if (j.ok) {
+          const h = this.list.find(x => x.id === id);
+          if (h) h.status = 'processing';
+          this._maybePoll();
+        } else {
+          alert(j.error || '操作失败');
+        }
+      } catch (e) { alert('网络错误'); }
     },
 
     async remove(id) {

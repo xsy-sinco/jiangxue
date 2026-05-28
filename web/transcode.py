@@ -16,6 +16,7 @@ import os
 import queue
 import shutil
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -23,6 +24,11 @@ from web import db
 
 FFMPEG_BIN = os.environ.get("FFMPEG_BIN", "ffmpeg")
 FFPROBE_BIN = os.environ.get("FFPROBE_BIN", "ffprobe")
+
+
+def _log(msg: str) -> None:
+    # gunicorn 把 stderr 收进 journal，方便 journalctl -u dota-stats 查转码情况
+    print(f"[transcode] {msg}", file=sys.stderr, flush=True)
 
 # 浏览器基本都能解的视频编码；容器层面 mp4/webm 最稳
 _BROWSER_OK_CODECS = {"h264", "vp8", "vp9", "av1"}
@@ -82,21 +88,28 @@ def needs_transcode(path: Path, ext: str) -> bool:
 
 
 def _run_ffmpeg(src: Path, dst: Path) -> bool:
-    """转成 H.264/AAC mp4 + faststart。最长跑 1 小时。成功返回 True。"""
+    """转成 H.264/AAC mp4 + faststart。最长跑 1 小时。成功返回 True。
+
+    不加缩放滤镜，最大化兼容性（避免 filtergraph 解析坑）；体积由上传大小上限兜底。
+    """
     cmd = [
         FFMPEG_BIN, "-y", "-i", str(src),
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-        # 超过 1080p 的等比缩到 1080p，控制体积；高度为偶数（libx264 要求）
-        "-vf", "scale='min(1920,iw)':-2",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
         str(dst),
     ]
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
-    except Exception:
+    except Exception as e:
+        _log(f"ffmpeg 执行异常: {e}")
         return False
-    return r.returncode == 0 and dst.exists() and dst.stat().st_size > 0
+    ok = r.returncode == 0 and dst.exists() and dst.stat().st_size > 0
+    if not ok:
+        # 失败时把 ffmpeg 的报错尾巴写进日志，方便 journalctl 排查
+        tail = "\n".join((r.stderr or "").strip().splitlines()[-15:])
+        _log(f"ffmpeg 转码失败 rc={r.returncode} src={src.name}\n{tail}")
+    return ok
 
 
 def _process(highlight_id: int) -> None:
@@ -115,6 +128,7 @@ def _process(highlight_id: int) -> None:
     same = out_path == src
     work = db.HIGHLIGHT_DIR / f"{stem}.transcoding.mp4" if same else out_path
 
+    _log(f"开始转码 #{highlight_id} {src.name}")
     if _run_ffmpeg(src, work):
         if same:
             os.replace(str(work), str(src))
@@ -127,6 +141,7 @@ def _process(highlight_id: int) -> None:
             highlight_id, "ready",
             filename=final_name, size_bytes=final_path.stat().st_size,
         )
+        _log(f"转码完成 #{highlight_id} -> {final_name}")
     else:
         # 转码失败：清理临时文件，标记失败（原文件保留，至少能下到）
         if work.exists() and work != src:

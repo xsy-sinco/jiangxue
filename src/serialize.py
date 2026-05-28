@@ -5,6 +5,7 @@ from __future__ import annotations
 from statistics import mean
 from typing import Any
 
+from src import awards
 from src.heroes import HeroIndex
 from src.stats import FactionStats, HeroStats, MatchPlayer, MatchRow, PlayerStats
 
@@ -88,6 +89,10 @@ def _match_player(mp: MatchPlayer, hero_index: HeroIndex,
 def _match(m: MatchRow, hero_index: HeroIndex,
            name_map: dict[int, str]) -> dict[str, Any]:
     mm, ss = divmod(m.duration_sec, 60)
+    players = [_match_player(p, hero_index, name_map) for p in m.players]
+    # 单场综合分 + 颁奖（前后端唯一口径，见 src/awards.py）
+    for p in players:
+        p["score"] = round(awards.per_match_score(p))
     return {
         "match_id": m.match_id,
         "start_time": m.start_time.strftime("%Y-%m-%d %H:%M"),
@@ -100,10 +105,65 @@ def _match(m: MatchRow, hero_index: HeroIndex,
         "dire_score": m.dire_score,
         "radiant_players": m.radiant_players.split(", ") if m.radiant_players else [],
         "dire_players": m.dire_players.split(", ") if m.dire_players else [],
-        "players": [_match_player(p, hero_index, name_map) for p in m.players],
+        "players": players,
+        # {award_key: players 下标}，前端按下标取该场获奖玩家
+        "awards": awards.compute_match_awards(players),
         "dotabuff": f"https://www.dotabuff.com/matches/{m.match_id}",
         "opendota": f"https://www.opendota.com/matches/{m.match_id}",
     }
+
+
+def _player_extras(serialized_matches: list[dict[str, Any]]) -> dict[int, dict[str, Any]]:
+    """从已序列化的对局里，按 account_id 累计：实力分、各项场均、荣誉次数。
+
+    这部分原先在 index.html / player.html 的 _enrichPlayers 各算一遍，现收口到后端。
+    """
+    tot: dict[int, dict[str, float]] = {}
+    honors: dict[int, dict[str, int]] = {}
+
+    for m in serialized_matches:
+        for p in m["players"]:
+            aid = p.get("account_id")
+            if aid is None:
+                continue  # 匿名玩家不进个人累计
+            t = tot.setdefault(aid, {
+                "s": 0.0, "gpm": 0, "xpm": 0, "hd": 0, "td": 0,
+                "heal": 0, "dn": 0, "nw": 0, "n": 0,
+            })
+            t["s"] += awards.per_match_score(p)
+            t["gpm"] += p.get("gpm", 0)
+            t["xpm"] += p.get("xpm", 0)
+            t["hd"] += p.get("hero_damage", 0)
+            t["td"] += p.get("tower_damage", 0)
+            t["heal"] += p.get("hero_healing", 0)
+            t["dn"] += p.get("denies", 0)
+            t["nw"] += p.get("net_worth", 0)
+            t["n"] += 1
+
+        match_awards = m.get("awards")
+        if match_awards:
+            for key, idx in match_awards.items():
+                aid = m["players"][idx].get("account_id")
+                if aid is None:
+                    continue
+                h = honors.setdefault(aid, {k: 0 for k in awards.AWARD_KEYS})
+                h[key] += 1
+
+    extras: dict[int, dict[str, Any]] = {}
+    for aid, t in tot.items():
+        n = t["n"] or 1
+        extras[aid] = {
+            "skill_score": round(t["s"] / n),
+            "avg_gpm": round(t["gpm"] / n),
+            "avg_xpm": round(t["xpm"] / n),
+            "avg_hero_damage": round(t["hd"] / n),
+            "avg_tower_damage": round(t["td"] / n),
+            "avg_hero_healing": round(t["heal"] / n),
+            "avg_denies": round(t["dn"] / n * 10) / 10,
+            "avg_net_worth": round(t["nw"] / n),
+            "awards": honors.get(aid, {k: 0 for k in awards.AWARD_KEYS}),
+        }
+    return extras
 
 
 def serialize(result: dict[str, Any], hero_index: HeroIndex, league_id: int,
@@ -124,9 +184,21 @@ def serialize(result: dict[str, Any], hero_index: HeroIndex, league_id: int,
     # 玩家最终展示名：取聚合后 PlayerStats.name（已经处理过 alias）
     name_map: dict[int, str] = {p.account_id: p.name for p in players.values()}
 
+    serialized_matches = [_match(m, hero_index, name_map) for m in
+                          sorted(matches, key=lambda x: x.start_time, reverse=True)]
+
+    # 实力分 / 场均 / 荣誉次数：从对局里累计后并入玩家 dict
+    extras = _player_extras(serialized_matches)
+    serialized_players = []
+    for p in sorted(players.values(), key=lambda x: -x.matches):
+        d = _player(p, hero_index)
+        d.update(extras.get(p.account_id, {}))
+        serialized_players.append(d)
+
     return {
         "league_id": league_id,
         "league_name": league_name or f"League {league_id}",
+        "award_meta": awards.AWARD_META,
         "summary": {
             "total_matches": len(matches),
             "radiant_wins": faction.radiant_wins,
@@ -140,10 +212,8 @@ def serialize(result: dict[str, Any], hero_index: HeroIndex, league_id: int,
             "avg_kills_per_match": avg_kills_per_match,
             "total_kills": total_kills,
         },
-        "players": [_player(p, hero_index) for p in
-                    sorted(players.values(), key=lambda x: -x.matches)],
+        "players": serialized_players,
         "heroes": [_hero(h, hero_index) for h in
                    sorted(heroes.values(), key=lambda x: -x.picks)],
-        "matches": [_match(m, hero_index, name_map) for m in
-                    sorted(matches, key=lambda x: x.start_time, reverse=True)],
+        "matches": serialized_matches,
     }

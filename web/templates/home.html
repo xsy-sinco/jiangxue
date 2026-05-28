@@ -457,63 +457,25 @@ function home() {
       }
     },
 
-    _perMatchScore(p) {
-      return (p.kills * 1.7 + p.assists * 2.0 - p.deaths * 0.5) * 80
-           + (p.hero_damage   || 0) / 100
-           + (p.tower_damage  || 0) / 45
-           + (p.hero_healing  || 0) / 80
-           + (p.gpm           || 0) * 1.2
-           + (p.xpm           || 0) * 0.8
-           + (p.last_hits     || 0) * 0.2
-           + (p.denies        || 0) * 2.5
-           + (p.net_worth     || 0) / 900
-           + (p.level         || 0) * 2.8
-           + (p.win ? 100 : 0);
-    },
-
     _enrichPlayers() {
-      const tot = {};
-      const wk = {};                                              // 近一周聚合
+      // 赛季实力分 / 场均由后端 serialize 提供；这里只额外算"近一周"聚合 + 挂 profile
+      const wk = {};
       const weekCutoff = Math.floor(Date.now() / 1000) - 7 * 86400;
       for (const m of this.stats.matches || []) {
-        const inWeek = (m.start_ts || 0) >= weekCutoff;
+        if ((m.start_ts || 0) < weekCutoff) continue;
         for (const p of m.players || []) {
           if (!p.account_id) continue;
-          if (!tot[p.account_id]) tot[p.account_id] = { s:0, gpm:0, hd:0, td:0, heal:0, dn:0, nw:0, xpm:0, n:0 };
-          const t = tot[p.account_id];
-          const sc = this._perMatchScore(p);
-          t.s += sc;
-          t.gpm += p.gpm || 0;          t.xpm += p.xpm || 0;
-          t.hd  += p.hero_damage || 0;   t.td  += p.tower_damage || 0;
-          t.heal+= p.hero_healing || 0;  t.dn  += p.denies || 0;
-          t.nw  += p.net_worth || 0;
-          t.n++;
-          if (inWeek) {
-            if (!wk[p.account_id]) wk[p.account_id] = { s:0, k:0, d:0, a:0, gpm:0, hd:0, td:0, heal:0, dn:0, nw:0, wins:0, n:0 };
-            const w = wk[p.account_id];
-            w.s += sc;
-            w.k += p.kills || 0;          w.d += p.deaths || 0;     w.a += p.assists || 0;
-            w.gpm += p.gpm || 0;          w.hd += p.hero_damage || 0;  w.td += p.tower_damage || 0;
-            w.heal += p.hero_healing || 0; w.dn += p.denies || 0;   w.nw += p.net_worth || 0;
-            if (p.win) w.wins++;
-            w.n++;
-          }
+          if (!wk[p.account_id]) wk[p.account_id] = { s:0, k:0, d:0, a:0, gpm:0, hd:0, td:0, heal:0, dn:0, nw:0, wins:0, n:0 };
+          const w = wk[p.account_id];
+          w.s += p.score || 0;
+          w.k += p.kills || 0;          w.d += p.deaths || 0;     w.a += p.assists || 0;
+          w.gpm += p.gpm || 0;          w.hd += p.hero_damage || 0;  w.td += p.tower_damage || 0;
+          w.heal += p.hero_healing || 0; w.dn += p.denies || 0;   w.nw += p.net_worth || 0;
+          if (p.win) w.wins++;
+          w.n++;
         }
       }
       for (const p of this.stats.players) {
-        const t = tot[p.account_id];
-        if (t && t.n) {
-          p.skill_score      = Math.round(t.s   / t.n);
-          p.avg_gpm          = Math.round(t.gpm / t.n);
-          p.avg_xpm          = Math.round(t.xpm / t.n);
-          p.avg_hero_damage  = Math.round(t.hd  / t.n);
-          p.avg_tower_damage = Math.round(t.td  / t.n);
-          p.avg_hero_healing = Math.round(t.heal/ t.n);
-          p.avg_denies       = Math.round(t.dn  / t.n * 10) / 10;
-          p.avg_net_worth    = Math.round(t.nw  / t.n);
-        } else {
-          p.skill_score = 0;
-        }
         const w = wk[p.account_id];
         if (w && w.n) {
           p.week_matches         = w.n;

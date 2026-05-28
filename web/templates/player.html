@@ -158,6 +158,24 @@
         </div>
       </section>
 
+      <!-- ===== 荣誉墙 ===== -->
+      <section class="panel p-5 mb-6" x-show="awardMeta.length">
+        <h2 class="font-bold text-gold mb-4 flex items-center gap-2">
+          <span class="w-1 h-4 bg-gold rounded"></span> 🏆 荣誉墙
+          <span class="text-xs text-muted font-normal">累计获得的单场奖项</span>
+        </h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          <template x-for="a in awardMeta" :key="a.key">
+            <div class="bg-panel2 rounded-lg p-3 text-center border border-border"
+                 :class="(player.awards?.[a.key]||0) > 0 ? '' : 'opacity-40'">
+              <div class="text-2xl" x-text="a.emoji"></div>
+              <div class="text-2xl font-black gold-text mt-1" x-text="player.awards?.[a.key] || 0"></div>
+              <div class="text-[11px] text-muted mt-0.5" x-text="a.label"></div>
+            </div>
+          </template>
+        </div>
+      </section>
+
       <!-- ===== 战斗数据 ===== -->
       <section class="panel p-5 mb-6">
         <h2 class="font-bold text-gold mb-4 flex items-center gap-2">
@@ -346,6 +364,7 @@
               {icon:'💔', label:'败方 MVP',    player: matchAwards(selectedMatch).loserMvp,    color:'text-direhi',    sub: (p) => p.kills+'/'+p.deaths+'/'+p.assists+' · '+Math.round(p.hero_damage/1000)+'K伤害'},
               {icon:'⚔️', label:'最多击杀',    player: matchAwards(selectedMatch).mostKills,   color:'text-gold',      sub: (p) => p.kills+' 击杀'},
               {icon:'🤝', label:'最多助攻',    player: matchAwards(selectedMatch).mostAssists, color:'text-gold',      sub: (p) => p.assists+' 助攻'},
+              {icon:'🎭', label:'演员',        player: matchAwards(selectedMatch).actor,       color:'text-direhi',    sub: (p) => p.deaths+' 次死亡'},
             ]" :key="award.label">
               <div class="bg-panel2 rounded p-3 border-l-2"
                    :class="award.player.win ? 'border-radiant' : 'border-dire'">
@@ -442,6 +461,7 @@ function playerPage(accountId) {
     myMatches: [],
     shownCount: 20,
     selectedMatch: null,
+    awardMeta: [],
 
     async init() {
       const [statsRes, profilesRes] = await Promise.all([
@@ -451,7 +471,8 @@ function playerPage(accountId) {
       const stats = statsRes.data;
       const profiles = profilesRes || {};
       if (stats) {
-        this._enrich(stats);
+        // 实力分 / 场均 / 荣誉次数由后端 serialize 算好，直接读
+        this.awardMeta = stats.award_meta || [];
         this.player = stats.players.find(p => p.account_id === this.accountId) || null;
         if (this.player) {
           this.profile = profiles[this.accountId] || null;
@@ -477,90 +498,21 @@ function playerPage(accountId) {
       return this.myMatches.slice(0, this.shownCount);
     },
 
-    _enrich(stats) {
-      const score = (p) => (p.kills * 1.7 + p.assists * 2.0 - p.deaths * 0.5) * 80
-                         + (p.hero_damage   || 0) / 100
-                         + (p.tower_damage  || 0) / 45
-                         + (p.hero_healing  || 0) / 80
-                         + (p.gpm           || 0) * 1.2
-                         + (p.xpm           || 0) * 0.8
-                         + (p.last_hits     || 0) * 0.2
-                         + (p.denies        || 0) * 2.5
-                         + (p.net_worth     || 0) / 900
-                         + (p.level         || 0) * 2.8
-                         + (p.win ? 100 : 0);
-      const tot = {};
-      for (const m of stats.matches || []) {
-        for (const p of m.players || []) {
-          if (!p.account_id) continue;
-          if (!tot[p.account_id]) tot[p.account_id] = { s:0, gpm:0, hd:0, td:0, heal:0, dn:0, nw:0, xpm:0, n:0 };
-          const t = tot[p.account_id];
-          t.s += score(p);
-          t.gpm += p.gpm || 0;       t.xpm += p.xpm || 0;
-          t.hd  += p.hero_damage || 0;  t.td  += p.tower_damage || 0;
-          t.heal+= p.hero_healing || 0;  t.dn  += p.denies || 0;
-          t.nw  += p.net_worth || 0;
-          t.n++;
-        }
-      }
-      for (const p of stats.players) {
-        const t = tot[p.account_id];
-        if (t && t.n) {
-          p.skill_score      = Math.round(t.s   / t.n);
-          p.avg_gpm          = Math.round(t.gpm / t.n);
-          p.avg_xpm          = Math.round(t.xpm / t.n);
-          p.avg_hero_damage  = Math.round(t.hd  / t.n);
-          p.avg_tower_damage = Math.round(t.td  / t.n);
-          p.avg_hero_healing = Math.round(t.heal/ t.n);
-          p.avg_denies       = Math.round(t.dn  / t.n * 10) / 10;
-          p.avg_net_worth    = Math.round(t.nw  / t.n);
-        } else {
-          p.skill_score = 0;
-        }
-      }
-    },
-
     positionLabel(pos) {
       return ['', '1号位 大哥', '2号位 中单', '3号位 抗压路', '4号位 游走', '5号位 辅助'][pos] || '';
     },
 
-    // 对局抽屉用的颁奖逻辑（跟战绩页同一套公式）
+    // 单场颁奖 / 综合分均由后端 src/awards.py 算好，前端只解析下标 / 读 p.score
     matchAwards(match) {
-      if (!match?.players?.length) return null;
-      const score = (p) => (p.kills * 1.7 + p.assists * 2.0 - p.deaths * 0.5) * 80
-                         + (p.hero_damage   || 0) / 100
-                         + (p.tower_damage  || 0) / 45
-                         + (p.hero_healing  || 0) / 80
-                         + (p.gpm           || 0) * 1.2
-                         + (p.xpm           || 0) * 0.8
-                         + (p.last_hits     || 0) * 0.2
-                         + (p.denies        || 0) * 2.5
-                         + (p.net_worth     || 0) / 900
-                         + (p.level         || 0) * 2.8
-                         + (p.win ? 100 : 0);
-      const cScore = (p) => p.net_worth / 1000 + p.hero_damage / 100;
-      const winners = match.players.filter(p => p.win);
-      const losers  = match.players.filter(p => !p.win);
-      const maxBy = (arr, fn) => arr.reduce((a, b) => fn(b) > fn(a) ? b : a);
-      const minBy = (arr, fn) => arr.reduce((a, b) => fn(b) < fn(a) ? b : a);
-      if (!winners.length || !losers.length) return null;
-      return {
-        mvp:         maxBy(winners, score),
-        loserMvp:    maxBy(losers,  score),
-        carry:       maxBy(winners, cScore),
-        carried:     minBy(winners, score),
-        mostKills:   maxBy(match.players, p => p.kills),
-        mostAssists: maxBy(match.players, p => p.assists),
-        scores: Object.fromEntries(match.players.map(p => [
-          p.account_id + '_' + p.hero_id, Math.round(score(p)),
-        ])),
-      };
+      const a = match?.awards;
+      if (!a || !match.players?.length) return null;
+      const out = {};
+      for (const k in a) out[k] = match.players[a[k]];
+      return out;
     },
 
     matchPlayerScore(match, p) {
-      const a = this.matchAwards(match);
-      if (!a) return 0;
-      return a.scores[p.account_id + '_' + p.hero_id] || 0;
+      return p.score || 0;
     },
   };
 }

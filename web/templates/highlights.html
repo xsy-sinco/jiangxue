@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>集锦 · 江雪杯</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0e1a'/><text x='50' y='72' font-size='70' text-anchor='middle' fill='%23c8aa6e'>%F0%9F%8E%AC</text></svg>" />
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: {
+      bg: '#0a0e1a', panel: '#141a2a', panel2: '#1c2338', border: '#2a3148',
+      gold: '#c8aa6e', goldhi: '#f0d486', radiant: '#92a629', radianthi: '#b5cf3b',
+      dire: '#c23c2a', direhi: '#e85a45', muted: '#7a8499',
+    }}}};
+  </script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+  <style>
+    body {
+      background:
+        radial-gradient(circle at 80% 0%, rgba(168,85,247,.06), transparent 40%),
+        radial-gradient(circle at 0% 100%, rgba(146,166,41,.05), transparent 40%),
+        linear-gradient(180deg, #0a0e1a, #06090f);
+      color: #e8eaed; min-height: 100vh;
+      font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    .panel {
+      background: linear-gradient(180deg, rgba(28,35,56,.85), rgba(20,26,42,.85));
+      border: 1px solid #2a3148; border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .gold-text {
+      background: linear-gradient(180deg, #f0d486 0%, #c8aa6e 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    input, textarea {
+      background: #0a0e1a; border: 1px solid #2a3148; border-radius: 6px;
+      padding: 8px 12px; color: #e8eaed; font-size: 14px; width: 100%;
+    }
+    input:focus, textarea:focus { border-color: #c8aa6e; outline: none; }
+    label { display: block; font-size: 12px; color: #7a8499; margin-bottom: 4px; }
+    .btn { padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 13px; transition: all .15s; cursor: pointer; border: 0; }
+    .btn-primary { background: #c8aa6e; color: #0a0e1a; }
+    .btn-primary:hover:not(:disabled) { background: #f0d486; }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  </style>
+</head>
+<body class="antialiased">
+
+{% include "_nav.html" %}
+
+<div x-data="highlights()" x-init="init()" class="max-w-5xl mx-auto px-4 py-6">
+
+  <!-- ====== 顶部介绍 ====== -->
+  <header class="panel p-6 mb-6 relative overflow-hidden">
+    <div class="absolute -right-12 -top-12 w-48 h-48 rounded-full opacity-10"
+         style="background: radial-gradient(circle, #c084fc, transparent 70%);"></div>
+    <div class="relative flex items-center gap-4">
+      <span class="text-5xl">🎬</span>
+      <div>
+        <h1 class="text-3xl font-black gold-text">集锦专区</h1>
+        <p class="text-sm text-muted mt-1">江雪杯精彩瞬间 · 队员自行上传的对局集锦</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ====== 上传表单（登录后可见） ====== -->
+  <div class="panel p-5 mb-6" x-show="user.logged_in">
+    <h3 class="text-sm font-bold text-gold mb-3 flex items-center gap-2">
+      <span>✚</span> 上传一段集锦
+    </h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+      <div>
+        <label>标题</label>
+        <input type="text" x-model="form.title" maxlength="100" placeholder="例如：决赛 G3 极限翻盘"/>
+      </div>
+      <div>
+        <label>选择视频文件</label>
+        <input type="file" :accept="acceptAttr" @change="onFile($event)"/>
+      </div>
+    </div>
+    <div class="mb-3">
+      <label>描述（可选）</label>
+      <textarea x-model="form.description" rows="2" maxlength="500"
+                placeholder="精彩点 / 选手 / 时间点……"></textarea>
+    </div>
+
+    <!-- 配额提示 -->
+    <p class="text-xs text-muted mb-3" x-show="quota">
+      单文件最大 <span class="text-gold" x-text="quota.max_mb"></span> MB ·
+      已用 <span class="text-gold" x-text="quota.used_mb"></span> /
+      <span x-text="quota.cap_mb"></span> MB ·
+      磁盘剩余 <span x-text="(quota.free_mb/1024).toFixed(1)"></span> GB ·
+      支持 <span x-text="(quota.allowed_exts||[]).join('/')"></span>
+    </p>
+
+    <!-- 进度条 -->
+    <div x-show="busy" class="mb-3">
+      <div class="h-2 bg-panel2 rounded overflow-hidden">
+        <div class="h-full bg-gold transition-all" :style="`width:${progress}%`"></div>
+      </div>
+      <div class="text-xs text-muted mt-1" x-text="`上传中… ${progress}%`"></div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <button @click="upload()" :disabled="busy" class="btn btn-primary">
+        <span x-text="busy ? '上传中…' : '上传'"></span>
+      </button>
+      <span x-show="msg" :class="msg.startsWith('✓') ? 'text-radianthi text-sm' : 'text-direhi text-sm'"
+            x-text="msg"></span>
+    </div>
+  </div>
+
+  <div class="panel p-5 mb-6 text-center" x-show="!user.logged_in && !loading">
+    <p class="text-sm text-muted">登录后才能上传集锦</p>
+    <a href="/me" class="inline-block mt-2 btn btn-primary">去登录 / 注册</a>
+  </div>
+
+  <!-- ====== 列表 ====== -->
+  <div x-show="loading" class="text-center py-12 text-muted">加载中…</div>
+
+  <div x-show="!loading && list.length === 0" class="panel p-12 text-center">
+    <div class="text-6xl mb-3">🎞</div>
+    <h3 class="text-lg font-bold text-gold mb-2">还没有集锦</h3>
+    <p class="text-sm text-muted">登录后上传第一段精彩瞬间吧</p>
+  </div>
+
+  <div class="space-y-6">
+    <template x-for="h in list" :key="h.id">
+      <article class="panel p-5">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div class="min-w-0 flex-1">
+            <h2 class="text-xl font-bold gold-text truncate" x-text="h.title"></h2>
+            <div class="text-xs text-muted mt-1 flex items-center gap-3 flex-wrap">
+              <span x-text="`📅 ${fmtDate(h.created_at)}`"></span>
+              <span x-show="h.size_bytes" x-text="`${(h.size_bytes/1048576).toFixed(1)} MB`"></span>
+            </div>
+          </div>
+          <button x-show="user.logged_in && user.account_id === h.created_by"
+                  @click="remove(h.id)"
+                  class="text-direhi/60 hover:text-direhi text-sm">删除</button>
+        </div>
+
+        <p x-show="h.description" class="text-sm text-muted mb-3 whitespace-pre-wrap" x-text="h.description"></p>
+
+        <template x-if="h.status === 'ready'">
+          <video :src="h.video_url" controls preload="metadata"
+                 class="w-full rounded-lg bg-black max-h-[70vh]"></video>
+        </template>
+        <template x-if="h.status === 'processing'">
+          <div class="rounded-lg bg-panel2 border border-border py-10 text-center">
+            <div class="text-3xl mb-2 inline-block animate-spin">⏳</div>
+            <p class="text-sm text-gold">转码中…（正在转成浏览器可播放的 H.264）</p>
+            <p class="text-xs text-muted mt-1">完成后会自动显示，无需手动刷新</p>
+          </div>
+        </template>
+        <template x-if="h.status === 'failed'">
+          <div class="rounded-lg bg-panel2 border border-dire/40 py-8 text-center">
+            <p class="text-sm text-direhi">✗ 转码失败，可能是不支持的格式或文件损坏</p>
+            <a :href="h.video_url" class="text-xs text-muted hover:text-gold underline" download>下载原文件</a>
+          </div>
+        </template>
+      </article>
+    </template>
+  </div>
+
+  <footer class="text-center text-xs text-muted mt-8 py-4">
+    集锦由队员自行上传，请勿上传无关 / 侵权内容
+  </footer>
+</div>
+
+<script>
+function highlights() {
+  return {
+    loading: true,
+    busy: false,
+    progress: 0,
+    msg: '',
+    user: { logged_in: false, account_id: null },
+    list: [],
+    quota: null,
+    file: null,
+    form: { title: '', description: '' },
+    _pollTimer: null,
+
+    get acceptAttr() {
+      const exts = (this.quota?.allowed_exts || ['mp4', 'webm', 'mov', 'm4v']);
+      return exts.map(e => '.' + e).join(',');
+    },
+
+    async init() {
+      const [me, items, quota] = await Promise.all([
+        fetch('/api/me').then(r => r.json()).catch(() => ({logged_in:false})),
+        fetch('/api/highlights').then(r => r.json()).catch(() => []),
+        fetch('/api/highlights/quota').then(r => r.json()).catch(() => null),
+      ]);
+      this.user = me;
+      this.list = items || [];
+      this.quota = quota;
+      this.loading = false;
+      this._maybePoll();
+    },
+
+    // 有转码中的集锦时，定时拉列表刷新状态；都好了就停
+    _maybePoll() {
+      if (this._pollTimer || !this.list.some(h => h.status === 'processing')) return;
+      this._pollTimer = setInterval(async () => {
+        const items = await fetch('/api/highlights').then(r => r.json()).catch(() => null);
+        if (items) this.list = items;
+        if (!this.list.some(h => h.status === 'processing')) {
+          clearInterval(this._pollTimer);
+          this._pollTimer = null;
+        }
+      }, 4000);
+    },
+
+    fmtDate(ts) {
+      if (!ts) return '';
+      const d = new Date(ts * 1000);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    },
+
+    onFile(e) {
+      this.file = e.target.files[0] || null;
+    },
+
+    async refreshQuota() {
+      this.quota = await fetch('/api/highlights/quota').then(r => r.json()).catch(() => this.quota);
+    },
+
+    upload() {
+      if (this.busy) return;
+      this.msg = '';
+      if (!this.form.title.trim()) { this.msg = '✗ 请填标题'; return; }
+      if (!this.file) { this.msg = '✗ 请选择视频文件'; return; }
+      // 前端先按配额粗判一下大小，省得白传
+      if (this.quota && this.file.size > this.quota.max_mb * 1048576) {
+        this.msg = `✗ 文件 ${(this.file.size/1048576).toFixed(0)}MB 超过上限 ${this.quota.max_mb}MB`;
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('video', this.file);
+      fd.append('title', this.form.title);
+      fd.append('description', this.form.description);
+
+      this.busy = true; this.progress = 0;
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/highlights');
+      xhr.upload.onprogress = (ev) => {
+        if (ev.lengthComputable) this.progress = Math.round(ev.loaded / ev.total * 100);
+      };
+      xhr.onload = () => {
+        this.busy = false;
+        let j = {};
+        try { j = JSON.parse(xhr.responseText); } catch (e) {}
+        if (xhr.status === 413) {
+          this.msg = '✗ 文件超过服务器上限';
+          return;
+        }
+        if (j.ok) {
+          this.list.unshift(j.highlight);
+          this.form = { title: '', description: '' };
+          this.file = null;
+          this.msg = j.highlight.status === 'processing' ? '✓ 已上传，正在转码…' : '✓ 已上传';
+          this.refreshQuota();
+          this._maybePoll();
+          setTimeout(() => this.msg = '', 2500);
+        } else {
+          this.msg = '✗ ' + (j.error || `上传失败 (${xhr.status})`);
+        }
+      };
+      xhr.onerror = () => { this.busy = false; this.msg = '✗ 网络错误'; };
+      xhr.send(fd);
+    },
+
+    async remove(id) {
+      if (!confirm('确定删除这段集锦？文件会一并删除。')) return;
+      try {
+        const r = await fetch(`/api/highlights/${id}`, {method: 'DELETE'});
+        const j = await r.json();
+        if (j.ok) {
+          this.list = this.list.filter(h => h.id !== id);
+          this.refreshQuota();
+        } else {
+          alert(j.error || '删除失败');
+        }
+      } catch (e) { alert('网络错误'); }
+    },
+  };
+}
+</script>
+
+</body></html>

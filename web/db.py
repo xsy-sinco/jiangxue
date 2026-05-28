@@ -17,6 +17,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 DB_DIR = ROOT / "community"
 DB_PATH = DB_DIR / "community.db"
+HIGHLIGHT_DIR = DB_DIR / "uploads" / "highlights"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS profiles (
@@ -51,6 +52,20 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date DESC);
+
+CREATE TABLE IF NOT EXISTS highlights (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    title         TEXT NOT NULL,
+    description   TEXT,
+    filename      TEXT NOT NULL,
+    original_name TEXT,
+    size_bytes    INTEGER,
+    status        TEXT,           -- ready / processing / failed
+    created_by    INTEGER,
+    created_at    INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_highlights_created ON highlights(created_at DESC);
 """
 
 # 允许通过 POST /api/me/profile 更新的字段（用户名/密码走单独接口）
@@ -60,11 +75,17 @@ EDITABLE_FIELDS = {"avatar_url", "display_name", "bio", "signature", "positions"
 def init_db() -> None:
     DB_DIR.mkdir(parents=True, exist_ok=True)
     (DB_DIR / "uploads" / "avatars").mkdir(parents=True, exist_ok=True)
+    (DB_DIR / "uploads" / "highlights").mkdir(parents=True, exist_ok=True)
     with get_conn() as c:
         c.executescript(SCHEMA)
         # 旧 DB 没有 positions 列时无痛迁移
         try:
             c.execute("ALTER TABLE profiles ADD COLUMN positions TEXT")
+        except sqlite3.OperationalError:
+            pass  # 已存在
+        # 旧 DB 没有 highlights.status 列时无痛迁移
+        try:
+            c.execute("ALTER TABLE highlights ADD COLUMN status TEXT")
         except sqlite3.OperationalError:
             pass  # 已存在
 
@@ -232,6 +253,82 @@ def delete_event(event_id: int, current_account_id: int) -> bool:
             return False
         c.execute("DELETE FROM events WHERE id = ?", (event_id,))
     return True
+
+
+# ============== HIGHLIGHTS (集锦) ==============
+
+def _row_to_highlight(row: sqlite3.Row) -> dict[str, Any]:
+    d = dict(row)
+    d["status"] = d.get("status") or "ready"  # 旧记录 NULL 视为 ready
+    return d
+
+
+def list_highlights() -> list[dict[str, Any]]:
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT * FROM highlights ORDER BY created_at DESC, id DESC"
+        ).fetchall()
+    return [_row_to_highlight(r) for r in rows]
+
+
+def create_highlight(
+    title: str,
+    filename: str,
+    original_name: str | None = None,
+    size_bytes: int | None = None,
+    description: str | None = None,
+    created_by: int | None = None,
+    status: str = "ready",
+) -> dict[str, Any]:
+    now = int(time.time())
+    with get_conn() as c:
+        cur = c.execute(
+            "INSERT INTO highlights "
+            "(title, description, filename, original_name, size_bytes, status, created_by, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (title, description, filename, original_name, size_bytes, status, created_by, now),
+        )
+        row = c.execute("SELECT * FROM highlights WHERE id = ?", (cur.lastrowid,)).fetchone()
+    return _row_to_highlight(row)
+
+
+def get_highlight(highlight_id: int) -> dict[str, Any] | None:
+    with get_conn() as c:
+        row = c.execute("SELECT * FROM highlights WHERE id = ?", (highlight_id,)).fetchone()
+    return _row_to_highlight(row) if row else None
+
+
+def set_highlight_status(
+    highlight_id: int,
+    status: str,
+    filename: str | None = None,
+    size_bytes: int | None = None,
+) -> None:
+    """转码 worker 用：更新状态，必要时同步替换后的文件名 / 大小。"""
+    sets = ["status = ?"]
+    vals: list[Any] = [status]
+    if filename is not None:
+        sets.append("filename = ?")
+        vals.append(filename)
+    if size_bytes is not None:
+        sets.append("size_bytes = ?")
+        vals.append(size_bytes)
+    vals.append(highlight_id)
+    with get_conn() as c:
+        c.execute(f"UPDATE highlights SET {', '.join(sets)} WHERE id = ?", vals)
+
+
+def delete_highlight(highlight_id: int, current_account_id: int) -> str | None:
+    """只允许创建者删除。返回被删记录的 filename（供调用方清理磁盘文件），
+    找不到或无权时返回 None。"""
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT created_by, filename FROM highlights WHERE id = ?", (highlight_id,)
+        ).fetchone()
+        if not row or row["created_by"] != current_account_id:
+            return None
+        c.execute("DELETE FROM highlights WHERE id = ?", (highlight_id,))
+    return row["filename"]
 
 
 def upsert_profile(account_id: int, **fields: Any) -> dict[str, Any] | None:

@@ -33,3 +33,6 @@ env/
 .idea/
 *.swp
 .DS_Store
+
+# Claude Code 本地设置（含历史命令里的 steam_api_key，严禁入库）
+.claude/settings.local.json

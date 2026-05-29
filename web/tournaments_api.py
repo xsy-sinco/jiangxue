@@ -290,10 +290,7 @@ def assign(tid):
     if su.get("team_id"):
         return jsonify({"error": "该选手已在某队，请先撤销再重拍"}), 400
 
-    budget = tdb.team_budget(tid, team)
-    if tdb.team_spent(tid, team_id) + price > budget:
-        return jsonify({"error": f"超出该队预算（{budget}）"}), 400
-
+    # 允许超出预算（剩余可为负）——拍卖时管理员自行把控
     tdb.assign_player(tid, target, team_id, price)
     return jsonify({"ok": True})
 

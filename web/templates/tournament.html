@@ -147,7 +147,8 @@
               <span class="text-xs text-muted">天梯 <span class="text-gray-300" x-text="mmrOf(s.account_id) ?? '—'"></span> · 实力 <span class="text-gray-300" x-text="skillOf(s.account_id) ?? '—'"></span> · 30天 <span class="text-gray-300" x-text="winrate30Of(s.account_id)"></span></span>
               <template x-if="me.is_admin">
                 <span class="flex items-center gap-1 ml-auto">
-                  <input type="number" min="0" style="width:84px" x-model.number="valDraft[s.account_id]" placeholder="身价"/>
+                  <input type="number" min="0" style="width:84px" x-model.number="valDraft[s.account_id]"
+                         @keydown.enter="saveValuation(s.account_id)" placeholder="身价(回车确定)"/>
                   <button class="btn btn-ghost" @click="saveValuation(s.account_id)">设</button>
                 </span>
               </template>
@@ -190,14 +191,15 @@
                 <span class="text-gold font-mono" x-text="teamSpent(tm.id)"></span><span>/</span>
                 <template x-if="me.is_admin">
                   <span class="flex items-center gap-1">
-                    <input type="number" min="0" style="width:70px" class="text-xs" x-model.number="tm.budget" :placeholder="t.per_team_budget"/>
+                    <input type="number" min="0" style="width:70px" class="text-xs" x-model.number="tm.budget" :placeholder="t.per_team_budget"
+                           @keydown.enter="saveBudget(tm)"/>
                     <button class="btn btn-ghost text-xs" @click="saveBudget(tm)">改</button>
                   </span>
                 </template>
                 <span x-show="!me.is_admin" class="font-mono" x-text="teamBudget(tm)"></span>
-                <span class="text-muted">（剩 <span x-text="teamBudget(tm)-teamSpent(tm.id)"></span>）</span>
+                <span class="text-muted">（剩 <span :class="teamBudget(tm)-teamSpent(tm.id) < 0 ? 'text-direhi font-bold' : ''" x-text="teamBudget(tm)-teamSpent(tm.id)"></span>）</span>
               </div>
-              <div class="h-1.5 bg-bg rounded mb-2 overflow-hidden"><div class="h-full bg-gold" :style="`width:${Math.min(100,(teamSpent(tm.id)/(teamBudget(tm)||1))*100)}%`"></div></div>
+              <div class="h-1.5 bg-bg rounded mb-2 overflow-hidden"><div class="h-full" :class="teamSpent(tm.id) > teamBudget(tm) ? 'bg-dire' : 'bg-gold'" :style="`width:${Math.min(100,(teamSpent(tm.id)/(teamBudget(tm)||1))*100)}%`"></div></div>
               <div class="space-y-1">
                 <template x-for="s in teamRoster(tm.id)" :key="s.account_id">
                   <div class="flex items-center gap-2 text-sm bg-panel2 rounded px-2 py-1">
@@ -230,7 +232,8 @@
                       <option :value="undefined">队伍</option>
                       <template x-for="tm in assignableTeams()" :key="tm.id"><option :value="tm.id" x-text="tm.name"></option></template>
                     </select>
-                    <input class="text-xs" style="width:60px" type="number" min="0" placeholder="价" x-model.number="assignPrice[s.account_id]"/>
+                    <input class="text-xs" style="width:60px" type="number" min="0" placeholder="价" x-model.number="assignPrice[s.account_id]"
+                           @keydown.enter="assign(s.account_id)"/>
                     <button class="btn btn-ghost text-xs" @click="assign(s.account_id)">录入</button>
                   </span>
                 </template>

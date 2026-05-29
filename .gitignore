@@ -10,6 +10,8 @@ output/
 *.log
 fetch.log
 serve.log
+*.zip
+*.tar.gz
 
 # 社区运行时数据：SQLite（含密码 hash）+ 用户上传头像，严禁入库
 community/

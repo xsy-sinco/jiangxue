@@ -334,9 +334,14 @@ def main() -> None:
     init_app()
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "5000"))
-    print(f"\n🎮 内战数据网页已启动")
+    # 本地开发：模板改了刷新即生效，不用重启（gunicorn 生产入口不走这里，不受影响）。
+    app.config["TEMPLATES_AUTO_RELOAD"] = True
+    # DEV=1 时开 Flask debug + 代码热重载（改 .py 也自动重启）。注意 debug 会暴露调试器，
+    # 只在本机 127.0.0.1 用；对外开放(HOST=0.0.0.0)时别开 DEV。
+    dev = os.environ.get("DEV") == "1"
+    print(f"\n🎮 内战数据网页已启动" + ("（DEV 热重载）" if dev else ""))
     print(f"   浏览器打开 → http://{host}:{port}\n")
-    app.run(host=host, port=port, debug=False)
+    app.run(host=host, port=port, debug=dev, use_reloader=dev)
 
 
 # gunicorn 直接导入 `web.app:app` 时，模块加载即触发 init（生产入口）

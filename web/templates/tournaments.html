@@ -75,15 +75,15 @@
   <div class="space-y-4">
     <template x-for="t in list" :key="t.id">
       <a :href="`/tournament/${t.id}`"
-         class="block rounded-xl overflow-hidden border border-border hover:border-gold/50 transition relative"
-         style="min-height:160px"
-         :style="t.cover_url
-           ? `background-image:linear-gradient(180deg, rgba(10,14,26,.15), rgba(10,14,26,.92)), url('${coverSrc(t.cover_url)}'); background-size:cover; background-position:center;`
-           : 'background:linear-gradient(135deg,#1c2338,#141a2a);'">
-        <div class="absolute inset-x-0 bottom-0 p-4 flex items-end justify-between gap-3">
+         class="block rounded-xl overflow-hidden border border-border hover:border-gold/50 transition relative bg-panel2">
+        <template x-if="t.cover_url">
+          <img :src="coverSrc(t.cover_url)" loading="lazy" class="w-full h-40 object-cover" />
+        </template>
+        <div class="p-4 flex items-end justify-between gap-3"
+             :class="t.cover_url ? 'absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent' : ''">
           <div class="min-w-0">
             <div class="font-black text-xl truncate" :class="t.cover_url ? 'text-white' : 'gold-text'" x-text="t.name"></div>
-            <div class="text-xs text-muted mt-0.5 truncate" x-text="t.description || ''"></div>
+            <div class="text-xs mt-0.5 truncate" :class="t.cover_url ? 'text-gray-300' : 'text-muted'" x-text="t.description || ''"></div>
           </div>
           <span class="badge shrink-0" :class="statusClass(t.status)" x-text="statusLabel(t.status)"></span>
         </div>

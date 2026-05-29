@@ -197,6 +197,44 @@
     </div>
   </div>
 
+  <!-- ===== 管理员管理（仅管理员可见） ===== -->
+  <div class="panel p-6 mt-6" x-show="user.logged_in && user.is_admin">
+    <h2 class="text-lg font-black gold-text mb-1">🛡 管理员管理</h2>
+    <p class="text-xs text-muted mb-4">给其他人开 / 撤销管理员权限</p>
+
+    <div class="mb-4">
+      <div class="text-xs text-muted mb-2">当前管理员（<span x-text="adminList.length"></span>）</div>
+      <div class="space-y-1">
+        <template x-for="a in adminList" :key="a.account_id">
+          <div class="flex items-center gap-2 bg-panel2 rounded px-2 py-1.5 text-sm">
+            <span class="flex-1 truncate" x-text="adminName(a)"></span>
+            <span class="text-xs text-muted font-mono" x-text="a.account_id"></span>
+            <button x-show="a.account_id !== user.account_id" @click="setAdmin(a.account_id,false)"
+                    class="text-direhi/60 hover:text-direhi text-xs">撤销</button>
+            <span x-show="a.account_id === user.account_id" class="text-[10px] text-muted">你自己</span>
+          </div>
+        </template>
+        <div x-show="adminList.length===0" class="text-xs text-muted">（暂无 DB 标记的管理员；config.json 名单里的不在此列）</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="text-xs text-muted mb-2">添加管理员：搜玩家昵称 / account_id</div>
+      <input type="text" x-model="adminSearch" placeholder="搜玩家…"/>
+      <div class="max-h-52 overflow-y-auto space-y-1 mt-2" x-show="adminSearch">
+        <template x-for="p in adminCandidates()" :key="p.account_id">
+          <div class="flex items-center gap-2 text-sm py-1">
+            <span class="flex-1 truncate" x-text="p.name"></span>
+            <span class="text-xs text-muted font-mono" x-text="p.account_id"></span>
+            <button @click="setAdmin(p.account_id,true)" class="btn-primary text-xs" style="width:auto;padding:3px 10px">设为管理员</button>
+          </div>
+        </template>
+        <div x-show="adminCandidates().length===0" class="text-xs text-muted py-2">没有匹配的（或已是管理员）</div>
+      </div>
+    </div>
+    <p x-show="adminMsg" class="mt-3 text-sm" :class="adminMsg.startsWith('✓')?'text-radianthi':'text-direhi'" x-text="adminMsg"></p>
+  </div>
+
 </div>
 
 <script>
@@ -212,7 +250,10 @@ function me() {
 
     myPlayer: null,
     allPlayers: [],
+    playerMap: {},
     profiles: {},
+
+    adminList: [], adminSearch: '', adminMsg: '',
 
     form: { avatar_url: null, signature: '', bio: '', positions: [], mmr: null },
     tagsInput: '',
@@ -227,6 +268,7 @@ function me() {
       ]);
       this.user = meData;
       this.allPlayers = statsData?.data?.players || [];
+      this.playerMap = Object.fromEntries(this.allPlayers.map(p => [p.account_id, p]));
       this.profiles = profilesData || {};
       if (meData.logged_in) {
         this.myPlayer = this.allPlayers.find(p => p.account_id === meData.account_id);
@@ -238,8 +280,35 @@ function me() {
           this.form.mmr        = meData.profile.mmr ?? null;
           this.tagsInput       = (meData.profile.custom_tags || []).join(', ');
         }
+        if (meData.is_admin) await this.loadAdmins();
       }
       this.loading = false;
+    },
+
+    // ===== 管理员管理 =====
+    async loadAdmins() {
+      this.adminList = await fetch('/api/admins').then(r => r.json()).catch(() => []);
+    },
+    adminName(a) {
+      return a.display_name || a.username || this.playerMap[a.account_id]?.name || ('id_' + a.account_id);
+    },
+    adminCandidates() {
+      const q = (this.adminSearch || '').trim().toLowerCase();
+      if (!q) return [];
+      const isAdmin = new Set(this.adminList.map(a => a.account_id));
+      return this.allPlayers.filter(p => !isAdmin.has(p.account_id) &&
+        ((p.name || '').toLowerCase().includes(q) || String(p.account_id).includes(q))).slice(0, 30);
+    },
+    async setAdmin(account_id, grant) {
+      if (!grant && !confirm('确定撤销该账号的管理员权限？')) return;
+      try {
+        const j = await fetch('/api/admins', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({account_id, grant}),
+        }).then(r => r.json());
+        if (j.ok) { await this.loadAdmins(); this.adminSearch = ''; this.adminMsg = grant ? '✓ 已设为管理员' : '✓ 已撤销'; setTimeout(() => this.adminMsg = '', 2500); }
+        else this.adminMsg = '✗ ' + (j.error || '操作失败');
+      } catch(e) { this.adminMsg = '✗ 网络错误'; }
     },
 
     get regCandidates() {

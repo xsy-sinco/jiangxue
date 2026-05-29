@@ -135,10 +135,151 @@
         <p x-show="msg" class="mt-3 text-sm" :class="msg.startsWith('✓')?'text-radianthi':'text-direhi'" x-text="msg"></p>
       </section>
 
-      <!-- ===== 其余 tab：阶段 3/4 上线 ===== -->
-      <section x-show="tab==='valuation'" class="panel p-8 text-center text-muted">选手身价（管理员设定）· 下一步上线</section>
-      <section x-show="tab==='auction'" class="panel p-8 text-center text-muted">队伍 &amp; 选马拍卖 · 下一步上线</section>
-      <section x-show="tab==='bracket'" class="panel p-8 text-center text-muted">赛程对阵（TI 式）· 下一步上线</section>
+      <!-- ===== 选手身价 ===== -->
+      <section x-show="tab==='valuation'" class="panel p-5">
+        <h2 class="font-bold text-gold mb-3">选手身价 <span class="text-xs text-muted font-normal" x-show="me.is_admin">· 管理员可编辑</span></h2>
+        <div x-show="signups.length===0" class="text-sm text-muted text-center py-4">还没有报名选手</div>
+        <div class="space-y-1">
+          <template x-for="s in signups" :key="s.account_id">
+            <div class="flex items-center gap-2 bg-panel2 rounded px-2 py-1.5 text-sm flex-wrap">
+              <img class="avatar" style="width:26px;height:26px" :src="avatarOf(s.account_id)" onerror="this.src='/static/default-avatar.svg'"/>
+              <span class="font-bold truncate" style="min-width:70px" x-text="nameOf(s.account_id)"></span>
+              <span class="text-xs text-muted">天梯 <span class="text-gray-300" x-text="mmrOf(s.account_id) ?? '—'"></span> · 实力 <span class="text-gray-300" x-text="skillOf(s.account_id) ?? '—'"></span> · 30天 <span class="text-gray-300" x-text="winrate30Of(s.account_id)"></span></span>
+              <template x-if="me.is_admin">
+                <span class="flex items-center gap-1 ml-auto">
+                  <input type="number" min="0" style="width:84px" x-model.number="valDraft[s.account_id]" placeholder="身价"/>
+                  <button class="btn btn-ghost" @click="saveValuation(s.account_id)">设</button>
+                </span>
+              </template>
+              <span x-show="!me.is_admin" class="ml-auto text-gold font-mono">身价 <span x-text="s.valuation ?? '—'"></span></span>
+            </div>
+          </template>
+        </div>
+        <p x-show="msg" class="mt-2 text-sm" :class="msg.startsWith('✓')?'text-radianthi':'text-direhi'" x-text="msg"></p>
+      </section>
+
+      <!-- ===== 队伍 & 选马拍卖 ===== -->
+      <section x-show="tab==='auction'" class="space-y-4">
+        <!-- 建队（管理员） -->
+        <div class="panel p-4" x-show="me.is_admin">
+          <h3 class="font-bold text-gold mb-2 text-sm">建队</h3>
+          <div class="flex items-end gap-2 flex-wrap">
+            <div><label class="block text-xs text-muted mb-1">队名</label><input x-model="teamForm.name" placeholder="战队名"/></div>
+            <div><label class="block text-xs text-muted mb-1">队长（可选）</label>
+              <select x-model.number="teamForm.captain">
+                <option :value="null">— 不指定 —</option>
+                <template x-for="s in signups" :key="s.account_id"><option :value="s.account_id" x-text="nameOf(s.account_id)"></option></template>
+              </select></div>
+            <button class="btn btn-primary" @click="newTeam()">建队</button>
+          </div>
+        </div>
+
+        <!-- 队伍卡 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <template x-for="tm in teams" :key="tm.id">
+            <div class="panel p-4">
+              <div class="flex items-center justify-between mb-1">
+                <div class="font-bold" x-text="tm.name"></div>
+                <button x-show="me.is_admin" @click="delTeam(tm.id)" class="text-direhi/60 hover:text-direhi text-xs">解散</button>
+              </div>
+              <div class="text-xs text-muted mb-2">队长：<span x-text="tm.captain_account_id ? nameOf(tm.captain_account_id) : '—'"></span></div>
+              <div class="text-xs mb-1">预算 <span class="text-gold font-mono" x-text="teamSpent(tm.id)"></span> / <span class="font-mono" x-text="t.per_team_budget"></span>
+                <span class="text-muted">（剩 <span x-text="(t.per_team_budget||0)-teamSpent(tm.id)"></span>）</span></div>
+              <div class="h-1.5 bg-bg rounded mb-2 overflow-hidden"><div class="h-full bg-gold" :style="`width:${Math.min(100,(teamSpent(tm.id)/((t.per_team_budget)||1))*100)}%`"></div></div>
+              <div class="space-y-1">
+                <template x-for="s in teamRoster(tm.id)" :key="s.account_id">
+                  <div class="flex items-center gap-2 text-sm bg-panel2 rounded px-2 py-1">
+                    <img class="avatar" style="width:24px;height:24px" :src="avatarOf(s.account_id)" onerror="this.src='/static/default-avatar.svg'"/>
+                    <span class="flex-1 truncate" x-text="nameOf(s.account_id)"></span>
+                    <span class="badge bg-gold/20 text-goldhi" x-show="s.is_captain">队长</span>
+                    <span class="text-gold font-mono" x-show="!s.is_captain" x-text="s.auction_price"></span>
+                    <button x-show="me.is_admin && !s.is_captain" @click="unassign(s.account_id)" class="text-direhi/60 hover:text-direhi text-xs">撤</button>
+                  </div>
+                </template>
+                <div x-show="teamRoster(tm.id).length===0" class="text-xs text-muted">暂无队员</div>
+              </div>
+            </div>
+          </template>
+          <div x-show="teams.length===0" class="text-sm text-muted">还没有队伍<span x-show="me.is_admin">，先在上面建队</span></div>
+        </div>
+
+        <!-- 待拍选手 -->
+        <div class="panel p-4">
+          <h3 class="font-bold text-gold mb-2 text-sm">待拍选手 <span class="text-muted font-normal" x-text="`(${unassignedPlayers().length})`"></span></h3>
+          <div class="space-y-1">
+            <template x-for="s in unassignedPlayers()" :key="s.account_id">
+              <div class="flex items-center gap-2 bg-panel2 rounded px-2 py-1.5 text-sm flex-wrap">
+                <img class="avatar" style="width:26px;height:26px" :src="avatarOf(s.account_id)" onerror="this.src='/static/default-avatar.svg'"/>
+                <span class="font-bold truncate" style="min-width:70px" x-text="nameOf(s.account_id)"></span>
+                <span class="text-xs text-muted">身价 <span class="text-gold" x-text="s.valuation ?? '—'"></span> · 天梯 <span x-text="mmrOf(s.account_id) ?? '—'"></span> · 实力 <span x-text="skillOf(s.account_id) ?? '—'"></span></span>
+                <template x-if="canAssign">
+                  <span class="flex items-center gap-1 ml-auto">
+                    <select class="text-xs" x-model.number="assignTeam[s.account_id]">
+                      <option :value="undefined">队伍</option>
+                      <template x-for="tm in assignableTeams()" :key="tm.id"><option :value="tm.id" x-text="tm.name"></option></template>
+                    </select>
+                    <input class="text-xs" style="width:60px" type="number" min="0" placeholder="价" x-model.number="assignPrice[s.account_id]"/>
+                    <button class="btn btn-ghost text-xs" @click="assign(s.account_id)">录入</button>
+                  </span>
+                </template>
+              </div>
+            </template>
+            <div x-show="unassignedPlayers().length===0" class="text-xs text-muted">没有待拍选手</div>
+          </div>
+          <p x-show="msg" class="mt-2 text-sm" :class="msg.startsWith('✓')?'text-radianthi':'text-direhi'" x-text="msg"></p>
+        </div>
+      </section>
+
+      <!-- ===== 赛程（TI 式分轮） ===== -->
+      <section x-show="tab==='bracket'" class="space-y-4">
+        <div class="panel p-4" x-show="me.is_admin">
+          <h3 class="font-bold text-gold mb-2 text-sm">添加对阵</h3>
+          <div class="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+            <div><label class="block text-xs text-muted mb-1">轮次</label><input x-model="matchForm.round_name" placeholder="小组赛/决赛"/></div>
+            <div><label class="block text-xs text-muted mb-1">队伍A</label><select x-model.number="matchForm.team_a_id"><option :value="undefined">—</option><template x-for="tm in teams" :key="tm.id"><option :value="tm.id" x-text="tm.name"></option></template></select></div>
+            <div><label class="block text-xs text-muted mb-1">队伍B</label><select x-model.number="matchForm.team_b_id"><option :value="undefined">—</option><template x-for="tm in teams" :key="tm.id"><option :value="tm.id" x-text="tm.name"></option></template></select></div>
+            <div><label class="block text-xs text-muted mb-1">BO</label><input type="number" min="1" x-model.number="matchForm.best_of"/></div>
+            <div><label class="block text-xs text-muted mb-1">时间(可选)</label><input x-model="matchForm.scheduled_time" placeholder="如 6/1 20:00"/></div>
+            <button class="btn btn-primary" @click="newMatch()">添加</button>
+          </div>
+        </div>
+
+        <div x-show="matches.length===0" class="panel p-8 text-center text-muted">还没有赛程</div>
+        <div class="flex gap-4 overflow-x-auto pb-2" x-show="matches.length">
+          <template x-for="rd in rounds()" :key="rd.name">
+            <div class="shrink-0" style="min-width:240px">
+              <div class="text-sm font-bold text-gold mb-2" x-text="rd.name || '未命名轮次'"></div>
+              <div class="space-y-3">
+                <template x-for="m in rd.matches" :key="m.id">
+                  <div class="panel p-3">
+                    <div class="flex items-center justify-between gap-2" :class="m.winner_team_id && m.winner_team_id===m.team_a_id ? 'text-radianthi font-bold' : ''">
+                      <span class="truncate text-sm" x-text="teamName(m.team_a_id) || '待定'"></span>
+                      <span class="font-mono" x-text="m.score_a"></span>
+                    </div>
+                    <div class="flex items-center justify-between gap-2 mt-1" :class="m.winner_team_id && m.winner_team_id===m.team_b_id ? 'text-radianthi font-bold' : ''">
+                      <span class="truncate text-sm" x-text="teamName(m.team_b_id) || '待定'"></span>
+                      <span class="font-mono" x-text="m.score_b"></span>
+                    </div>
+                    <div class="text-[10px] text-muted mt-1">BO<span x-text="m.best_of"></span><span x-show="m.scheduled_time"> · </span><span x-text="m.scheduled_time||''"></span></div>
+                    <div class="mt-2 pt-2 border-t border-border" x-show="me.is_admin">
+                      <div class="flex items-center gap-1 text-xs flex-wrap">
+                        <input type="number" min="0" style="width:40px" x-model.number="m.score_a"/><span>:</span><input type="number" min="0" style="width:40px" x-model.number="m.score_b"/>
+                        <select class="text-xs" x-model.number="m.winner_team_id">
+                          <option :value="null">胜方</option>
+                          <option :value="m.team_a_id" x-text="teamName(m.team_a_id)||'A'"></option>
+                          <option :value="m.team_b_id" x-text="teamName(m.team_b_id)||'B'"></option>
+                        </select>
+                        <button class="btn btn-ghost text-xs" @click="saveMatch(m)">存</button>
+                        <button class="text-direhi/60 hover:text-direhi" @click="delMatch(m.id)">✕</button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </section>
     </div>
   </template>
 </div>
@@ -156,6 +297,9 @@ function tournamentPage(tid) {
       {key:'auction', label:'队伍&拍卖'}, {key:'bracket', label:'赛程'},
     ],
     poolQuery: '', coverBusy: false, win30: {},
+    teamForm: { name:'', captain:null },
+    matchForm: { round_name:'', team_a_id:undefined, team_b_id:undefined, best_of:1, scheduled_time:'' },
+    assignTeam: {}, assignPrice: {}, valDraft: {},
 
     async init() {
       const [me, detail, stats, profiles] = await Promise.all([
@@ -189,6 +333,7 @@ function tournamentPage(tid) {
     _applyDetail(d) {
       if (!d || d.error) { this.t = null; return; }
       this.t = d.tournament; this.signups = d.signups || []; this.teams = d.teams || []; this.matches = d.matches || [];
+      this.valDraft = Object.fromEntries(this.signups.map(s => [s.account_id, s.valuation]));
     },
     async reload() {
       const d = await fetch(`/api/tournaments/${this.tid}`).then(r=>r.json()).catch(()=>null);
@@ -203,6 +348,12 @@ function tournamentPage(tid) {
     skillOf(aid){ return this.playerMap[aid]?.skill_score ?? null; },
     positionsOf(aid){ const p=this.profiles[aid]?.positions; return (p && p.length) ? p.join('/') : '—'; },
     winrate30Of(aid){ const r=this.win30[aid]; return (r && r.n) ? Math.round(r.w/r.n*100)+'%' : '—'; },
+    teamRoster(teamId){ return this.signups.filter(s=>s.team_id===teamId); },
+    teamSpent(teamId){ return this.signups.filter(s=>s.team_id===teamId).reduce((a,s)=>a+(s.auction_price||0),0); },
+    unassignedPlayers(){ return this.signups.filter(s=>!s.team_id && !s.is_captain); },
+    get canAssign(){ return this.me.is_admin || this.teams.some(tm=>tm.captain_account_id===this.me.account_id); },
+    assignableTeams(){ return this.me.is_admin ? this.teams : this.teams.filter(tm=>tm.captain_account_id===this.me.account_id); },
+    rounds(){ const order=[],map={}; for(const m of this.matches){ const k=m.round_name||''; if(!(k in map)){ map[k]={name:k,matches:[]}; order.push(k);} map[k].matches.push(m);} return order.map(k=>map[k]); },
     statusLabel(s){ return {registration:'报名中',auction:'拍卖中',bracket:'进行中',finished:'已结束'}[s]||s; },
     statusClass(s){ return {registration:'bg-radiant/20 text-radianthi',auction:'bg-gold/20 text-goldhi',bracket:'bg-gold/20 text-goldhi',finished:'bg-panel2 text-muted'}[s]||'bg-panel2 text-muted'; },
     get iSignedUp(){ return this.signups.some(s => s.account_id === this.me.account_id); },
@@ -239,6 +390,22 @@ function tournamentPage(tid) {
       const j=await this._post(`/api/tournaments/${this.tid}`,null,'DELETE');
       if(j.ok){ window.location.href='/tournaments'; } else this.flash('✗ '+(j.error||'删除失败'));
     },
+    // —— 身价 ——
+    async saveValuation(aid){ const v=this.valDraft[aid]; const j=await this._post(`/api/tournaments/${this.tid}/valuation`,{account_id:aid, valuation:(v===''||v==null)?null:v}); if(j.ok){ await this.reload(); this.flash('✓ 已设身价'); } else this.flash('✗ '+(j.error||'失败')); },
+    // —— 队伍 ——
+    async newTeam(){ if(!this.teamForm.name.trim()){ this.flash('✗ 请填队名'); return; } const j=await this._post(`/api/tournaments/${this.tid}/teams`,{name:this.teamForm.name, captain_account_id:this.teamForm.captain}); if(j.ok){ this.teamForm={name:'',captain:null}; await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
+    async delTeam(id){ if(!confirm('解散该队伍？队员会被释放回待拍池。')) return; const j=await this._post(`/api/tournaments/${this.tid}/teams/${id}`,null,'DELETE'); if(j.ok){ await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
+    // —— 拍卖录入 ——
+    async assign(aid){ const team=this.assignTeam[aid], price=this.assignPrice[aid];
+      if(team==null){ this.flash('✗ 选个队伍'); return; }
+      if(price==null||price===''){ this.flash('✗ 填成交价'); return; }
+      const j=await this._post(`/api/tournaments/${this.tid}/assign`,{account_id:aid, team_id:team, price});
+      if(j.ok){ this.assignTeam[aid]=undefined; this.assignPrice[aid]=undefined; await this.reload(); this.flash('✓ 已录入'); } else this.flash('✗ '+(j.error||'失败')); },
+    async unassign(aid){ const j=await this._post(`/api/tournaments/${this.tid}/unassign`,{account_id:aid}); if(j.ok){ await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
+    // —— 赛程 ——
+    async newMatch(){ const j=await this._post(`/api/tournaments/${this.tid}/matches`, this.matchForm); if(j.ok){ this.matchForm={round_name:this.matchForm.round_name, team_a_id:undefined, team_b_id:undefined, best_of:1, scheduled_time:''}; await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
+    async saveMatch(m){ const j=await this._post(`/api/tournaments/${this.tid}/matches/${m.id}`,{score_a:m.score_a, score_b:m.score_b, winner_team_id:m.winner_team_id}, 'PATCH'); if(j.ok){ this.flash('✓ 已保存'); await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
+    async delMatch(id){ if(!confirm('删除这个对阵？')) return; const j=await this._post(`/api/tournaments/${this.tid}/matches/${id}`,null,'DELETE'); if(j.ok){ await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
     async adminAddSignup(aid){ const j=await this._post(`/api/tournaments/${this.tid}/signups`,{account_id:aid}); if(j.ok){ await this.reload(); this.poolQuery=''; } else this.flash('✗ '+(j.error||'失败')); },
     async adminRemoveSignup(aid){ if(!confirm('移除该报名选手？')) return; const j=await this._post(`/api/tournaments/${this.tid}/signups/${aid}`,null,'DELETE'); if(j.ok){ await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
   };

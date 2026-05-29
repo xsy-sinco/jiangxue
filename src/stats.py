@@ -9,8 +9,22 @@ from typing import Any, Iterable
 from .api import ANONYMOUS_ACCOUNT_ID
 from .heroes import HeroIndex
 
-# 幽灵对局阈值：双方总人头（radiant_score + dire_score）低于此值视为开局即退的废局，直接丢弃
+# 幽灵局兜底阈值：缺 leaver 数据时，双方总人头低于此值视为废局
 GHOST_MIN_TOTAL_KILLS = 6
+
+
+def _is_ghost_match(m: dict[str, Any]) -> bool:
+    """判断是否为"幽灵/集体退出"废局，直接整局剔除。
+
+    主判据（与人头数无关）：没有任何玩家 leaver_status==0，即没人正常打完整局。
+    正常对局里赢的那队一定有人 leaver_status==0；全员非 0（掉线/放弃/未连）就是废局。
+    leaver_status 缺失（None）按"已完成"处理，从严避免误删真实局。
+    兜底：双方总人头 < GHOST_MIN_TOTAL_KILLS（防极少数缺 leaver 数据的废局漏网）。
+    """
+    players = m.get("players", [])
+    finished = any((p.get("leaver_status") or 0) == 0 for p in players)
+    total_kills = (m.get("radiant_score", 0) or 0) + (m.get("dire_score", 0) or 0)
+    return (not finished) or total_kills < GHOST_MIN_TOTAL_KILLS
 
 
 def _is_radiant(player: dict[str, Any]) -> bool:
@@ -159,17 +173,15 @@ def aggregate(
         if skipped_league:
             print(f"  [过滤] 跳过 {skipped_league} 场非 league={league_id} 的比赛")
 
-    # 剔除"幽灵对局"：开局后玩家基本都退了的局。没有干净的字段能判定
-    # （实测 leaver_status 全员退出=0 场），用总人头兜底：双方总击杀 < 阈值即丢弃。
-    # 这类对局完全不计入统计（总对局/玩家/英雄/对局列表都不出现）。
+    # 剔除"幽灵对局/集体中途退出"的废局，完全不计入统计（总对局/玩家/英雄/对局列表都不出现）。
+    # 主判据是字段信号、与人头多少无关：一局里只要没有任何人 leaver_status==0
+    # （即没人正常打完），就是废局——这样人头 9 个、15 个的集体退出局也照样剔除。
+    # 兜底：极少数缺 leaver 数据的局，再用双方总人头 < 阈值 兜一下。
     before = len(matches)
-    matches = [
-        m for m in matches
-        if (m.get("radiant_score", 0) or 0) + (m.get("dire_score", 0) or 0) >= GHOST_MIN_TOTAL_KILLS
-    ]
+    matches = [m for m in matches if not _is_ghost_match(m)]
     skipped_ghost = before - len(matches)
     if skipped_ghost:
-        print(f"  [过滤] 跳过 {skipped_ghost} 场幽灵对局（双方总人头 < {GHOST_MIN_TOTAL_KILLS}）")
+        print(f"  [过滤] 跳过 {skipped_ghost} 场幽灵对局（无人正常完成 / 总人头 < {GHOST_MIN_TOTAL_KILLS}）")
 
     for m in matches:
         radiant_win = bool(m.get("radiant_win"))

@@ -158,26 +158,35 @@
         </div>
       </section>
 
-      <!-- ===== 近 14 天 ===== -->
+      <!-- ===== 近 N 天 ===== -->
       <section class="panel p-5 mb-6">
-        <h2 class="font-bold text-gold mb-4 flex items-center gap-2">
-          <span class="w-1 h-4 bg-gold rounded"></span> 📅 近 14 天
-          <span class="text-xs text-muted font-normal" x-text="`(${recent14.total} 场)`"></span>
-        </h2>
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <h2 class="font-bold text-gold flex items-center gap-2">
+            <span class="w-1 h-4 bg-gold rounded"></span> 📅 近 <span x-text="recentDays"></span> 天
+            <span class="text-xs text-muted font-normal" x-text="`(${recentRec.total} 场)`"></span>
+          </h2>
+          <div class="flex items-center gap-1 text-xs">
+            <template x-for="d in [7,14,30]" :key="d">
+              <button @click="recentDays=d" class="px-2 py-1 rounded border transition"
+                      :class="recentDays===d ? 'border-gold text-gold' : 'border-border text-muted hover:text-white'"
+                      x-text="d+'天'"></button>
+            </template>
+          </div>
+        </div>
         <div class="grid grid-cols-3 gap-3 text-center">
           <div>
             <div class="text-xs text-muted">胜率</div>
             <div class="text-3xl font-black mt-1"
-                 :class="!recent14.total ? 'text-muted' : recent14.winrate >= 55 ? 'text-radianthi' : recent14.winrate < 45 ? 'text-direhi' : 'gold-text'"
-                 x-text="recent14.total ? recent14.winrate + '%' : '—'"></div>
+                 :class="!recentRec.total ? 'text-muted' : recentRec.winrate >= 55 ? 'text-radianthi' : recentRec.winrate < 45 ? 'text-direhi' : 'gold-text'"
+                 x-text="recentRec.total ? recentRec.winrate + '%' : '—'"></div>
           </div>
           <div>
             <div class="text-xs text-muted">胜场</div>
-            <div class="text-3xl font-black text-radianthi mt-1" x-text="recent14.wins"></div>
+            <div class="text-3xl font-black text-radianthi mt-1" x-text="recentRec.wins"></div>
           </div>
           <div>
             <div class="text-xs text-muted">负场</div>
-            <div class="text-3xl font-black text-direhi mt-1" x-text="recent14.losses"></div>
+            <div class="text-3xl font-black text-direhi mt-1" x-text="recentRec.losses"></div>
           </div>
         </div>
       </section>
@@ -486,6 +495,7 @@ function playerPage(accountId) {
     shownCount: 20,
     selectedMatch: null,
     awardMeta: [],
+    recentDays: 14,
 
     async init() {
       const [statsRes, profilesRes] = await Promise.all([
@@ -522,8 +532,8 @@ function playerPage(accountId) {
       return this.myMatches.slice(0, this.shownCount);
     },
 
-    get recent14() {
-      const cutoff = Math.floor(Date.now() / 1000) - 14 * 86400;
+    get recentRec() {
+      const cutoff = Math.floor(Date.now() / 1000) - this.recentDays * 86400;
       let w = 0, n = 0;
       for (const m of this.myMatches) {
         if ((m.start_ts || 0) < cutoff) continue;

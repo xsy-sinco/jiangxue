@@ -341,12 +341,20 @@
 
   <!-- ====== PLAYERS TAB ====== -->
   <section x-show="data && tab==='players'" class="panel p-4">
-    <div class="flex items-center gap-3 mb-3">
+    <div class="flex items-center gap-3 mb-3 flex-wrap">
       <input type="text" x-model="playerQueryDraft"
              @keydown.enter="commitSearch('player')"
              @input="clearSearchIfEmpty('player')"
              placeholder="搜玩家昵称或 account_id（按回车搜索）…"
-             class="flex-1 bg-bg border border-border rounded px-3 py-2 text-sm focus:border-gold outline-none" />
+             class="flex-1 min-w-[200px] bg-bg border border-border rounded px-3 py-2 text-sm focus:border-gold outline-none" />
+      <div class="flex items-center gap-1 text-xs">
+        <span class="text-muted mr-1">近期战绩</span>
+        <template x-for="d in [7,14,30]" :key="d">
+          <button @click="setRecentDays(d)" class="px-2 py-1 rounded border transition"
+                  :class="recentDays===d ? 'border-gold text-gold' : 'border-border text-muted hover:text-white'"
+                  x-text="d+'天'"></button>
+        </template>
+      </div>
       <span class="text-xs text-muted">点击表头排序</span>
     </div>
     <div class="overflow-x-auto scroll-thin">
@@ -358,6 +366,7 @@
             <th class="text-right py-2 px-2 sortable" @click="sortPlayers('matches')">场</th>
             <th class="text-right py-2 px-2 sortable" @click="sortPlayers('wins')">胜</th>
             <th class="text-right py-2 px-2 sortable" @click="sortPlayers('winrate')">胜率</th>
+            <th class="text-right py-2 px-2 whitespace-nowrap" x-text="'近'+recentDays+'天'"></th>
             <th class="text-right py-2 px-2 sortable" @click="sortPlayers('kills')">K</th>
             <th class="text-right py-2 px-2 sortable" @click="sortPlayers('deaths')">D</th>
             <th class="text-right py-2 px-2 sortable" @click="sortPlayers('assists')">A</th>
@@ -383,6 +392,17 @@
                 <span class="px-2 py-0.5 rounded text-xs font-bold"
                       :class="p.winrate >= 55 ? 'badge-radiant' : (p.winrate < 45 ? 'badge-dire' : 'bg-panel2 text-muted')"
                       x-text="p.winrate + '%'"></span>
+              </td>
+              <td class="text-right whitespace-nowrap">
+                <template x-if="p.recent && p.recent.total">
+                  <span>
+                    <span class="px-1.5 py-0.5 rounded text-xs font-bold"
+                          :class="p.recent.winrate >= 55 ? 'badge-radiant' : (p.recent.winrate < 45 ? 'badge-dire' : 'bg-panel2 text-muted')"
+                          x-text="p.recent.winrate + '%'"></span>
+                    <span class="text-[10px] ml-1"><span class="text-radianthi" x-text="p.recent.wins"></span>-<span class="text-direhi" x-text="p.recent.losses"></span></span>
+                  </span>
+                </template>
+                <span x-show="!p.recent || !p.recent.total" class="text-muted">—</span>
               </td>
               <td class="text-right font-mono" x-text="p.kills"></td>
               <td class="text-right font-mono" x-text="p.deaths"></td>
@@ -657,6 +677,27 @@
           </div>
         </div>
 
+        <!-- 近 N 天 -->
+        <div class="mb-5">
+          <div class="text-xs text-muted uppercase tracking-wider mb-2" x-text="'近 '+recentDays+' 天'"></div>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-panel2 p-2 rounded">
+              <div class="text-[10px] text-muted">胜率</div>
+              <div class="text-lg font-black"
+                   :class="!(drawerPlayer.recent && drawerPlayer.recent.total) ? 'text-muted' : (drawerPlayer.recent.winrate >= 55 ? 'text-radianthi' : drawerPlayer.recent.winrate < 45 ? 'text-direhi' : 'gold-text')"
+                   x-text="(drawerPlayer.recent && drawerPlayer.recent.total) ? drawerPlayer.recent.winrate+'%' : '—'"></div>
+            </div>
+            <div class="bg-panel2 p-2 rounded">
+              <div class="text-[10px] text-muted">胜</div>
+              <div class="text-lg font-black text-radianthi" x-text="drawerPlayer.recent ? drawerPlayer.recent.wins : 0"></div>
+            </div>
+            <div class="bg-panel2 p-2 rounded">
+              <div class="text-[10px] text-muted">负</div>
+              <div class="text-lg font-black text-direhi" x-text="drawerPlayer.recent ? drawerPlayer.recent.losses : 0"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- K/D/A 详细 -->
         <div class="grid grid-cols-3 gap-2 mb-5">
           <div class="bg-panel2 p-3 rounded">
@@ -868,6 +909,7 @@ function dashboard() {
     updatedAt: null,
     progress: {phase:'idle', current:0, total:0, message:''},
     honors30d: {},   // 近30天荣誉累计 {account_id: {award_key: count}}
+    recentDays: 14,  // 玩家列表/抽屉的"近期战绩"窗口，可切 7/14/30
 
     tab: 'players',
     tabLabels: {players:'玩家排行', heroes:'英雄数据', matches:'对局列表'},
@@ -950,6 +992,7 @@ function dashboard() {
         // 实力分 / 场均 / 荣誉次数现在由后端 serialize 算好，直接读 player.skill_score 等
         this._computeRankChanges();
         this._computeHonors30d();
+        this._computeRecent();
         // 等 Alpine 把 x-show 翻成可见 + 浏览器跑完 layout 再画图
         this.$nextTick(() => {
           requestAnimationFrame(() => this.drawCharts());
@@ -1284,6 +1327,26 @@ function dashboard() {
       }
       this.honors30d = h;
     },
+
+    // 近期战绩：给每个玩家算近 recentDays 天的胜/负/胜率，挂到 p.recent
+    _computeRecent() {
+      const cutoff = Math.floor(Date.now() / 1000) - this.recentDays * 86400;
+      const map = {};
+      for (const mt of this.data?.matches || []) {
+        if ((mt.start_ts || 0) < cutoff) continue;
+        for (const p of mt.players || []) {
+          if (!p.account_id) continue;
+          const r = map[p.account_id] || (map[p.account_id] = {w: 0, n: 0});
+          r.n++; if (p.win) r.w++;
+        }
+      }
+      for (const p of this.data?.players || []) {
+        const r = map[p.account_id];
+        const n = r ? r.n : 0, w = r ? r.w : 0;
+        p.recent = {wins: w, losses: n - w, total: n, winrate: n ? Math.round(w / n * 1000) / 10 : 0};
+      }
+    },
+    setRecentDays(d) { this.recentDays = d; this._computeRecent(); },
 
     // 荣誉榜（近30天）：某个奖项拿得最多的前 n 名玩家（次数 > 0）
     honorLeaderboard(key, n = 5) {

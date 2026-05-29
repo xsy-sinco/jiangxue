@@ -135,7 +135,7 @@
 
     <!-- 头像 -->
     <div class="flex items-center gap-5 mb-5 pb-5 border-b border-border">
-      <img class="avatar-big" :src="form.avatar_url || '/static/default-avatar.svg'"
+      <img class="avatar-big" :src="form.avatar_url || myPlayer?.steam_avatar || '/static/default-avatar.svg'"
            onerror="this.src='/static/default-avatar.svg'"/>
       <div class="flex-1">
         <label>头像</label>

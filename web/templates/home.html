@@ -215,7 +215,7 @@
             <div class="text-[10px] tracking-[0.3em] opacity-60 mb-2"
                  x-text="['冠军 CHAMPION','亚军 RUNNER-UP','季军 BRONZE'][p._rank-1]"></div>
             <img class="avatar-lg podium-avatar mx-auto mb-2"
-                 :src="p.profile?.avatar_url || '/static/default-avatar.svg'"
+                 :src="p.profile?.avatar_url || p.steam_avatar || '/static/default-avatar.svg'"
                  onerror="this.src='/static/default-avatar.svg'"/>
             <div class="font-black text-lg truncate" x-text="p.profile?.display_name || p.name"></div>
             <div class="flex items-center justify-center gap-1 flex-wrap mt-1">
@@ -361,7 +361,7 @@
           <div class="rank-chip" x-text="p._rank"></div>
 
           <div class="flex items-center gap-3 mb-3">
-            <img class="avatar" :src="p.profile?.avatar_url || '/static/default-avatar.svg'" :alt="p.name"
+            <img class="avatar" :src="p.profile?.avatar_url || p.steam_avatar || '/static/default-avatar.svg'" :alt="p.name"
                  onerror="this.src='/static/default-avatar.svg'" />
             <div class="flex-1 min-w-0 pr-7">
               <div class="font-bold truncate" x-text="p.profile?.display_name || p.name"></div>

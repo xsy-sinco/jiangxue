@@ -13,6 +13,7 @@ import time
 import requests
 
 BASE_URL = "https://api.steampowered.com/IDOTA2Match_570"
+STEAM_USER_URL = "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/"
 
 
 class SteamDotaClient:
@@ -72,3 +73,30 @@ class SteamDotaClient:
             # Steam 翻页约定：下一页 start_at_match_id = 本页最后一场 match_id - 1
             start_at = matches[-1]["match_id"] - 1
         return match_ids
+
+    def get_player_summaries(self, steamids: list[int]) -> dict[int, str]:
+        """批量取玩家头像：steamid64 -> avatarfull URL。
+
+        走 ISteamUser/GetPlayerSummaries（每次最多 100 个 steamid）。
+        某个请求失败就跳过那一批，不影响其余；只返回成功取到头像的。
+        """
+        out: dict[int, str] = {}
+        for i in range(0, len(steamids), 100):
+            batch = steamids[i:i + 100]
+            elapsed = time.monotonic() - self._last_ts
+            if elapsed < self.min_interval:
+                time.sleep(self.min_interval - elapsed)
+            params = {"key": self.api_key, "steamids": ",".join(str(s) for s in batch)}
+            try:
+                resp = self.session.get(STEAM_USER_URL, params=params, timeout=30)
+                self._last_ts = time.monotonic()
+                resp.raise_for_status()
+                players = resp.json().get("response", {}).get("players", [])
+            except Exception:
+                continue
+            for p in players:
+                sid = p.get("steamid")
+                url = p.get("avatarfull") or p.get("avatarmedium") or p.get("avatar")
+                if sid and url:
+                    out[int(sid)] = url
+        return out

@@ -10,7 +10,8 @@ from src.heroes import HeroIndex
 from src.stats import FactionStats, HeroStats, MatchPlayer, MatchRow, PlayerStats
 
 
-def _player(p: PlayerStats, hero_index: HeroIndex) -> dict[str, Any]:
+def _player(p: PlayerStats, hero_index: HeroIndex,
+            steam_avatars: dict[int, str] | None = None) -> dict[str, Any]:
     top = [
         {
             "hero_id": hid,
@@ -24,6 +25,8 @@ def _player(p: PlayerStats, hero_index: HeroIndex) -> dict[str, Any]:
     return {
         "account_id": p.account_id,
         "name": p.name,
+        # 默认头像：Steam 头像（前端再用自定义头像覆盖）
+        "steam_avatar": (steam_avatars or {}).get(p.account_id),
         "matches": p.matches,
         "wins": p.wins,
         "losses": p.matches - p.wins,
@@ -167,7 +170,8 @@ def _player_extras(serialized_matches: list[dict[str, Any]]) -> dict[int, dict[s
 
 
 def serialize(result: dict[str, Any], hero_index: HeroIndex, league_id: int,
-              league_name: str = "") -> dict[str, Any]:
+              league_name: str = "",
+              steam_avatars: dict[int, str] | None = None) -> dict[str, Any]:
     faction: FactionStats = result["faction"]
     players: dict[int, PlayerStats] = result["players"]
     heroes: dict[int, HeroStats] = result["heroes"]
@@ -191,7 +195,7 @@ def serialize(result: dict[str, Any], hero_index: HeroIndex, league_id: int,
     extras = _player_extras(serialized_matches)
     serialized_players = []
     for p in sorted(players.values(), key=lambda x: -x.matches):
-        d = _player(p, hero_index)
+        d = _player(p, hero_index, steam_avatars)
         d.update(extras.get(p.account_id, {}))
         serialized_players.append(d)
 

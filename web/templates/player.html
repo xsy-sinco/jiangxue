@@ -87,7 +87,7 @@
       <header class="panel p-6 mb-6">
         <div class="flex flex-col md:flex-row gap-6 items-start">
           <img class="avatar-xl shrink-0 mx-auto md:mx-0"
-               :src="profile?.avatar_url || '/static/default-avatar.svg'"
+               :src="profile?.avatar_url || player.steam_avatar || '/static/default-avatar.svg'"
                onerror="this.src='/static/default-avatar.svg'"/>
           <div class="flex-1 min-w-0 w-full">
             <div class="flex items-start justify-between gap-3 flex-wrap">

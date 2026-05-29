@@ -18,6 +18,7 @@ from pathlib import Path
 import requests
 from flask import Flask, jsonify, render_template, request
 
+from src import avatars
 from src.api import OpenDotaClient
 from src.heroes import HeroIndex
 from src.serialize import serialize
@@ -156,7 +157,8 @@ def _do_refresh() -> None:
 
         _set_progress("aggregate", message="聚合统计")
         result = aggregate(details, hero_index, cfg.get("player_aliases"), league_id=league_id)
-        data = serialize(result, hero_index, league_id, league_name)
+        steam_avatars = avatars.resolve(list(result["players"].keys()), steam_key)
+        data = serialize(result, hero_index, league_id, league_name, steam_avatars=steam_avatars)
 
         # 写盘缓存
         CACHE_JSON.parent.mkdir(parents=True, exist_ok=True)

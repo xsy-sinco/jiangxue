@@ -9,6 +9,7 @@ from pathlib import Path
 
 from tabulate import tabulate
 
+from . import avatars
 from .api import OpenDotaClient
 from .exporter import export_all
 from .heroes import HeroIndex
@@ -281,10 +282,14 @@ def main() -> int:
     print("计算统计…")
     result = aggregate(details, hero_index, cfg.get("player_aliases"), league_id=league_id)
 
+    # 拉取玩家 Steam 头像（默认头像；自定义头像由前端覆盖）
+    steam_avatars = avatars.resolve(list(result["players"].keys()), steam_key)
+
     # 同步生成网页用的 aggregate.json（即使 --no-export 也写，因为体积小且网页要用）
     agg_path = ROOT / "data" / "aggregate.json"
     agg_path.parent.mkdir(parents=True, exist_ok=True)
-    serialized = serialize(result, hero_index, league_id, league_name="")
+    serialized = serialize(result, hero_index, league_id, league_name="",
+                           steam_avatars=steam_avatars)
     agg_path.write_text(json.dumps(serialized, ensure_ascii=False), encoding="utf-8")
     print(f"  已更新 {agg_path.relative_to(ROOT)} (网页读这个)")
 

@@ -54,7 +54,11 @@ def main() -> int:
 
     result = aggregate(matches, hero_index, cfg.get("player_aliases"),
                        league_id=cfg.get("league_id"))
-    data = serialize(result, hero_index, cfg.get("league_id", 0), "")
+    # 离线重算：Steam 头像只用现有缓存（data/steam_avatars.json），不联网
+    from src import avatars
+    steam_avatars = avatars.resolve(list(result["players"].keys()), "")
+    data = serialize(result, hero_index, cfg.get("league_id", 0), "",
+                     steam_avatars=steam_avatars)
 
     out_path = Path("data/aggregate.json")
     out_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")

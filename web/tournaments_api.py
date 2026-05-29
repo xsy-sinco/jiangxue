@@ -228,7 +228,7 @@ def create_team(tid):
     if not name:
         return jsonify({"error": "队名不能为空"}), 400
     cap = _int(p.get("captain_account_id"))
-    team = tdb.create_team(tid, name, cap)
+    team = tdb.create_team(tid, name, cap, budget=_int(p.get("budget")))
     # 指定的队长：标记 is_captain + 归入本队
     if cap is not None and tdb.get_signup(tid, cap):
         tdb.set_captain(tid, cap, True)
@@ -243,7 +243,8 @@ def update_team(tid, team_id):
         return err
     p = request.get_json(silent=True) or {}
     tdb.update_team(team_id, name=(p.get("name") or None),
-                    captain_account_id=_int(p.get("captain_account_id")))
+                    captain_account_id=_int(p.get("captain_account_id")),
+                    budget=_int(p.get("budget")))
     return jsonify({"ok": True})
 
 
@@ -289,7 +290,7 @@ def assign(tid):
     if su.get("team_id"):
         return jsonify({"error": "该选手已在某队，请先撤销再重拍"}), 400
 
-    budget = tdb.get_tournament(tid).get("per_team_budget") or 0
+    budget = tdb.team_budget(tid, team)
     if tdb.team_spent(tid, team_id) + price > budget:
         return jsonify({"error": f"超出该队预算（{budget}）"}), 400
 

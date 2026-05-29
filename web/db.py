@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS teams (
     tournament_id      INTEGER NOT NULL,
     name               TEXT NOT NULL,
     captain_account_id INTEGER,
+    budget             INTEGER,          -- 该队预算；NULL 时回退赛事默认 per_team_budget
     created_at         INTEGER
 );
 
@@ -140,6 +141,7 @@ def init_db() -> None:
             "ALTER TABLE profiles ADD COLUMN is_admin INTEGER DEFAULT 0",
             "ALTER TABLE profiles ADD COLUMN mmr INTEGER",
             "ALTER TABLE tournaments ADD COLUMN cover_url TEXT",
+            "ALTER TABLE teams ADD COLUMN budget INTEGER",
         ):
             try:
                 c.execute(ddl)

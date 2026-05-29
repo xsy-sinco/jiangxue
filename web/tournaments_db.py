@@ -157,26 +157,40 @@ def get_team(team_id: int) -> dict[str, Any] | None:
     return dict(r) if r else None
 
 
-def create_team(tid: int, name: str, captain_account_id: int | None = None) -> dict[str, Any]:
+def create_team(tid: int, name: str, captain_account_id: int | None = None,
+                budget: int | None = None) -> dict[str, Any]:
+    if budget is None:  # 默认用赛事的每队预算
+        t = get_tournament(tid)
+        budget = (t or {}).get("per_team_budget")
     with get_conn() as c:
         cur = c.execute(
-            "INSERT INTO teams (tournament_id, name, captain_account_id, created_at) VALUES (?, ?, ?, ?)",
-            (tid, name, captain_account_id, _now()),
+            "INSERT INTO teams (tournament_id, name, captain_account_id, budget, created_at) VALUES (?, ?, ?, ?, ?)",
+            (tid, name, captain_account_id, budget, _now()),
         )
         r = c.execute("SELECT * FROM teams WHERE id = ?", (cur.lastrowid,)).fetchone()
     return dict(r)
 
 
-def update_team(team_id: int, name: str | None = None, captain_account_id: int | None = None) -> None:
+def update_team(team_id: int, name: str | None = None, captain_account_id: int | None = None,
+                budget: int | None = None) -> None:
     sets, vals = [], []
     if name is not None:
         sets.append("name = ?"); vals.append(name)
     if captain_account_id is not None:
         sets.append("captain_account_id = ?"); vals.append(captain_account_id)
+    if budget is not None:
+        sets.append("budget = ?"); vals.append(budget)
     if sets:
         vals.append(team_id)
         with get_conn() as c:
             c.execute(f"UPDATE teams SET {', '.join(sets)} WHERE id = ?", vals)
+
+
+def team_budget(tid: int, team: dict[str, Any]) -> int:
+    """队伍预算：自身 budget 优先，NULL 回退赛事 per_team_budget。"""
+    if team.get("budget") is not None:
+        return team["budget"]
+    return (get_tournament(tid) or {}).get("per_team_budget") or 0
 
 
 def delete_team(team_id: int) -> None:

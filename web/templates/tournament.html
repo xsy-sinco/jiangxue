@@ -170,6 +170,8 @@
                 <option :value="null">— 不指定 —</option>
                 <template x-for="s in signups" :key="s.account_id"><option :value="s.account_id" x-text="nameOf(s.account_id)"></option></template>
               </select></div>
+            <div><label class="block text-xs text-muted mb-1">预算（默认 <span x-text="t.per_team_budget"></span>）</label>
+              <input type="number" min="0" x-model.number="teamForm.budget" :placeholder="t.per_team_budget"/></div>
             <button class="btn btn-primary" @click="newTeam()">建队</button>
           </div>
         </div>
@@ -183,9 +185,19 @@
                 <button x-show="me.is_admin" @click="delTeam(tm.id)" class="text-direhi/60 hover:text-direhi text-xs">解散</button>
               </div>
               <div class="text-xs text-muted mb-2">队长：<span x-text="tm.captain_account_id ? nameOf(tm.captain_account_id) : '—'"></span></div>
-              <div class="text-xs mb-1">预算 <span class="text-gold font-mono" x-text="teamSpent(tm.id)"></span> / <span class="font-mono" x-text="t.per_team_budget"></span>
-                <span class="text-muted">（剩 <span x-text="(t.per_team_budget||0)-teamSpent(tm.id)"></span>）</span></div>
-              <div class="h-1.5 bg-bg rounded mb-2 overflow-hidden"><div class="h-full bg-gold" :style="`width:${Math.min(100,(teamSpent(tm.id)/((t.per_team_budget)||1))*100)}%`"></div></div>
+              <div class="text-xs mb-1 flex items-center gap-1 flex-wrap">
+                <span>预算</span>
+                <span class="text-gold font-mono" x-text="teamSpent(tm.id)"></span><span>/</span>
+                <template x-if="me.is_admin">
+                  <span class="flex items-center gap-1">
+                    <input type="number" min="0" style="width:70px" class="text-xs" x-model.number="tm.budget" :placeholder="t.per_team_budget"/>
+                    <button class="btn btn-ghost text-xs" @click="saveBudget(tm)">改</button>
+                  </span>
+                </template>
+                <span x-show="!me.is_admin" class="font-mono" x-text="teamBudget(tm)"></span>
+                <span class="text-muted">（剩 <span x-text="teamBudget(tm)-teamSpent(tm.id)"></span>）</span>
+              </div>
+              <div class="h-1.5 bg-bg rounded mb-2 overflow-hidden"><div class="h-full bg-gold" :style="`width:${Math.min(100,(teamSpent(tm.id)/(teamBudget(tm)||1))*100)}%`"></div></div>
               <div class="space-y-1">
                 <template x-for="s in teamRoster(tm.id)" :key="s.account_id">
                   <div class="flex items-center gap-2 text-sm bg-panel2 rounded px-2 py-1">
@@ -297,7 +309,7 @@ function tournamentPage(tid) {
       {key:'auction', label:'队伍&拍卖'}, {key:'bracket', label:'赛程'},
     ],
     poolQuery: '', coverBusy: false, win30: {},
-    teamForm: { name:'', captain:null },
+    teamForm: { name:'', captain:null, budget:null },
     matchForm: { round_name:'', team_a_id:undefined, team_b_id:undefined, best_of:1, scheduled_time:'' },
     assignTeam: {}, assignPrice: {}, valDraft: {},
 
@@ -348,6 +360,7 @@ function tournamentPage(tid) {
     skillOf(aid){ return this.playerMap[aid]?.skill_score ?? null; },
     positionsOf(aid){ const p=this.profiles[aid]?.positions; return (p && p.length) ? p.join('/') : '—'; },
     winrate30Of(aid){ const r=this.win30[aid]; return (r && r.n) ? Math.round(r.w/r.n*100)+'%' : '—'; },
+    teamBudget(tm){ return (tm.budget != null) ? tm.budget : (this.t?.per_team_budget || 0); },
     teamRoster(teamId){ return this.signups.filter(s=>s.team_id===teamId); },
     teamSpent(teamId){ return this.signups.filter(s=>s.team_id===teamId).reduce((a,s)=>a+(s.auction_price||0),0); },
     unassignedPlayers(){ return this.signups.filter(s=>!s.team_id && !s.is_captain); },
@@ -393,8 +406,9 @@ function tournamentPage(tid) {
     // —— 身价 ——
     async saveValuation(aid){ const v=this.valDraft[aid]; const j=await this._post(`/api/tournaments/${this.tid}/valuation`,{account_id:aid, valuation:(v===''||v==null)?null:v}); if(j.ok){ await this.reload(); this.flash('✓ 已设身价'); } else this.flash('✗ '+(j.error||'失败')); },
     // —— 队伍 ——
-    async newTeam(){ if(!this.teamForm.name.trim()){ this.flash('✗ 请填队名'); return; } const j=await this._post(`/api/tournaments/${this.tid}/teams`,{name:this.teamForm.name, captain_account_id:this.teamForm.captain}); if(j.ok){ this.teamForm={name:'',captain:null}; await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
+    async newTeam(){ if(!this.teamForm.name.trim()){ this.flash('✗ 请填队名'); return; } const j=await this._post(`/api/tournaments/${this.tid}/teams`,{name:this.teamForm.name, captain_account_id:this.teamForm.captain, budget:this.teamForm.budget}); if(j.ok){ this.teamForm={name:'',captain:null,budget:null}; await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
     async delTeam(id){ if(!confirm('解散该队伍？队员会被释放回待拍池。')) return; const j=await this._post(`/api/tournaments/${this.tid}/teams/${id}`,null,'DELETE'); if(j.ok){ await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
+    async saveBudget(tm){ const j=await this._post(`/api/tournaments/${this.tid}/teams/${tm.id}`,{budget:tm.budget},'PATCH'); if(j.ok){ await this.reload(); this.flash('✓ 已改预算'); } else this.flash('✗ '+(j.error||'失败')); },
     // —— 拍卖录入 ——
     async assign(aid){ const team=this.assignTeam[aid], price=this.assignPrice[aid];
       if(team==null){ this.flash('✗ 选个队伍'); return; }

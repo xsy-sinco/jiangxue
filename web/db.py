@@ -127,6 +127,7 @@ EDITABLE_FIELDS = {"avatar_url", "display_name", "bio", "signature", "positions"
 def init_db() -> None:
     DB_DIR.mkdir(parents=True, exist_ok=True)
     (DB_DIR / "uploads" / "avatars").mkdir(parents=True, exist_ok=True)
+    (DB_DIR / "uploads" / "tournaments").mkdir(parents=True, exist_ok=True)
     with get_conn() as c:
         # 集锦从"自传视频"改为"B站嵌入"：老表(含 filename 列)直接重建，顺带清空旧数据
         cols = [r[1] for r in c.execute("PRAGMA table_info(highlights)").fetchall()]

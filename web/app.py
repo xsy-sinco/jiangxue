@@ -34,6 +34,9 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 # Session 签名密钥。生产环境必须设 FLASK_SECRET_KEY 环境变量。
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-in-prod-please")
 
+# 上传体积上限（头像 5MB / 赛事封面 8MB），留余量 16MB；超过直接 413
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+
 # 信任反代的 X-Forwarded-Proto 等头，让 url_for(_external=True) 生成 https
 try:
     from werkzeug.middleware.proxy_fix import ProxyFix

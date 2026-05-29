@@ -50,8 +50,14 @@
       <div><label>每队预算</label><input type="number" x-model.number="form.per_team_budget" min="0"/></div>
     </div>
     <div class="mb-3"><label>简介（可选）</label><textarea x-model="form.description" rows="2" maxlength="500"></textarea></div>
-    <div class="mb-3"><label>封面图（把图片放进 data/，这里填文件名；或贴图片 URL）</label>
-      <input type="text" x-model="form.cover_url" placeholder="例如 江雪杯DOTA2比赛图片生成.png"/></div>
+    <div class="mb-3">
+      <label>封面图（从本地选图上传，可选）</label>
+      <input type="file" accept="image/*" @change="uploadCover($event)"/>
+      <span class="text-xs text-muted ml-2" x-show="coverBusy">上传中…</span>
+      <template x-if="form.cover_url">
+        <img :src="coverSrc(form.cover_url)" class="mt-2 rounded-lg max-h-36 border border-border"/>
+      </template>
+    </div>
     <div class="flex items-center gap-3">
       <button @click="create()" :disabled="busy" class="btn btn-primary"><span x-text="busy?'创建中…':'创建'"></span></button>
       <span x-show="msg" :class="msg.startsWith('✓')?'text-radianthi text-sm':'text-direhi text-sm'" x-text="msg"></span>
@@ -89,7 +95,7 @@
 <script>
 function tournamentsPage() {
   return {
-    loading: true, busy: false, msg: '',
+    loading: true, busy: false, coverBusy: false, msg: '',
     me: { logged_in:false, is_admin:false },
     list: [],
     form: { name:'', per_team_budget:1000, description:'', cover_url:'' },
@@ -102,6 +108,15 @@ function tournamentsPage() {
       this.me = me || {}; this.list = list || []; this.loading = false;
     },
     coverSrc(u){ if(!u) return ''; return (u.startsWith('http')||u.startsWith('/')) ? u : '/img/'+encodeURIComponent(u); },
+    async uploadCover(e){
+      const file = e.target.files[0]; if(!file) return;
+      this.coverBusy = true; this.msg = '';
+      try {
+        const fd = new FormData(); fd.append('image', file);
+        const j = await fetch('/api/tournaments/cover', {method:'POST', body:fd}).then(r=>r.json());
+        if (j.ok) this.form.cover_url = j.url; else this.msg = '✗ ' + (j.error || '上传失败');
+      } catch(e){ this.msg = '✗ 网络错误'; } finally { this.coverBusy = false; }
+    },
     statusLabel(s){ return {registration:'报名中', auction:'拍卖中', bracket:'进行中', finished:'已结束'}[s] || s; },
     statusClass(s){ return {
       registration:'bg-radiant/20 text-radianthi', auction:'bg-gold/20 text-goldhi',

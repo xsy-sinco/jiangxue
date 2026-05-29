@@ -6,12 +6,18 @@
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+import uuid
 
-from web import auth
+from flask import Blueprint, jsonify, request, send_from_directory
+
+from web import auth, db
 from web import tournaments_db as tdb
 
 bp = Blueprint("tournaments", __name__)
+
+COVER_DIR = db.DB_DIR / "uploads" / "tournaments"
+ALLOWED_IMG_EXTS = {"jpg", "jpeg", "png", "webp", "gif"}
+MAX_COVER_BYTES = 8 * 1024 * 1024  # 8MB
 
 
 def _int(v):
@@ -19,6 +25,41 @@ def _int(v):
         return int(v)
     except (TypeError, ValueError):
         return None
+
+
+# ============== 封面图上传 ==============
+
+@bp.route("/api/tournaments/cover", methods=["POST"])
+def upload_cover():
+    """管理员上传赛事封面图，返回可用的 url（存 community/uploads/tournaments/）。"""
+    err = auth.require_admin()
+    if err:
+        return err
+    if "image" not in request.files:
+        return jsonify({"error": "缺少 image 文件字段"}), 400
+    f = request.files["image"]
+    if not f.filename:
+        return jsonify({"error": "未选择文件"}), 400
+    ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
+    if ext not in ALLOWED_IMG_EXTS:
+        return jsonify({"error": f"格式不支持，仅允许 {', '.join(sorted(ALLOWED_IMG_EXTS))}"}), 400
+    f.seek(0, 2)
+    size = f.tell()
+    f.seek(0)
+    if size == 0:
+        return jsonify({"error": "空文件"}), 400
+    if size > MAX_COVER_BYTES:
+        return jsonify({"error": f"图片太大（{size // 1024 // 1024} MB > {MAX_COVER_BYTES // 1024 // 1024} MB）"}), 400
+
+    COVER_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"cover_{uuid.uuid4().hex}.{ext}"
+    f.save(str(COVER_DIR / filename))
+    return jsonify({"ok": True, "url": f"/uploads/tournaments/{filename}"})
+
+
+@bp.route("/uploads/tournaments/<path:filename>")
+def serve_cover(filename):
+    return send_from_directory(str(COVER_DIR), filename)
 
 
 # ============== 赛事 ==============

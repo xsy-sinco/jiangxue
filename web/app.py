@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 from src import avatars
 from src.api import OpenDotaClient
@@ -235,6 +235,17 @@ def tournaments_page():
 @app.route("/tournament/<int:tid>")
 def tournament_page(tid: int):
     return render_template("tournament.html", active="tournaments", tournament_id=tid)
+
+
+_IMG_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+
+
+@app.route("/img/<path:filename>")
+def data_image(filename):
+    """提供 data/ 目录下的图片（如赛事封面）。仅限图片扩展名，send_from_directory 防穿越。"""
+    if Path(filename).suffix.lower() not in _IMG_EXTS:
+        return "", 404
+    return send_from_directory(str(ROOT / "data"), filename)
 
 
 @app.route("/api/stats")

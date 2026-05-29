@@ -41,23 +41,33 @@
 
   <template x-if="t">
     <div>
-      <!-- 头部 -->
-      <header class="panel p-5 mb-4">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <a href="/tournaments" class="text-xs text-muted hover:text-gold">← 全部赛事</a>
-            <h1 class="text-2xl font-black gold-text mt-1 truncate" x-text="t.name"></h1>
-            <p class="text-sm text-muted mt-1" x-show="t.description" x-text="t.description"></p>
+      <!-- 头部（有封面图就做背景） -->
+      <header class="panel mb-4 relative overflow-hidden">
+        <div class="p-5 relative" style="min-height:120px"
+             :style="t.cover_url ? `background-image:linear-gradient(180deg, rgba(10,14,26,.45), rgba(10,14,26,.92)), url('${coverSrc(t.cover_url)}'); background-size:cover; background-position:center;` : ''">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <a href="/tournaments" class="text-xs text-muted hover:text-gold">← 全部赛事</a>
+              <h1 class="text-2xl font-black mt-1 truncate" :class="t.cover_url?'text-white':'gold-text'" x-text="t.name"></h1>
+              <p class="text-sm text-muted mt-1" x-show="t.description" x-text="t.description"></p>
+            </div>
+            <span class="badge shrink-0" :class="statusClass(t.status)" x-text="statusLabel(t.status)"></span>
           </div>
-          <span class="badge shrink-0" :class="statusClass(t.status)" x-text="statusLabel(t.status)"></span>
         </div>
-        <!-- 管理员：状态流转 -->
-        <div class="mt-3 flex items-center gap-2 flex-wrap" x-show="me.is_admin">
-          <span class="text-xs text-muted">管理员 · 状态：</span>
-          <template x-for="s in ['registration','auction','bracket','finished']" :key="s">
-            <button class="btn" :class="t.status===s?'btn-primary':'btn-ghost'" @click="setStatus(s)" x-text="statusLabel(s)"></button>
-          </template>
-          <span class="text-xs text-muted ml-2">每队预算 <span class="text-gold" x-text="t.per_team_budget"></span></span>
+        <!-- 管理员：状态流转 + 封面 -->
+        <div class="px-5 pb-4 pt-3 border-t border-border" x-show="me.is_admin">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs text-muted">状态：</span>
+            <template x-for="s in ['registration','auction','bracket','finished']" :key="s">
+              <button class="btn" :class="t.status===s?'btn-primary':'btn-ghost'" @click="setStatus(s)" x-text="statusLabel(s)"></button>
+            </template>
+            <span class="text-xs text-muted ml-2">每队预算 <span class="text-gold" x-text="t.per_team_budget"></span></span>
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <span class="text-xs text-muted shrink-0">封面：</span>
+            <input type="text" x-model="coverInput" placeholder="data/ 文件名 或 图片URL" class="flex-1"/>
+            <button class="btn btn-ghost" @click="saveCover()">保存封面</button>
+          </div>
         </div>
       </header>
 
@@ -97,14 +107,23 @@
         </div>
 
         <div x-show="signups.length===0" class="text-sm text-muted text-center py-6">还没有人报名</div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
           <template x-for="s in signups" :key="s.account_id">
-            <div class="flex items-center gap-2 bg-panel2 rounded p-2">
-              <img class="avatar" :src="avatarOf(s.account_id)" onerror="this.src='/static/default-avatar.svg'"/>
-              <a :href="`/player/${s.account_id}`" class="flex-1 truncate text-sm hover:text-gold" x-text="nameOf(s.account_id)"></a>
-              <span class="badge bg-gold/20 text-goldhi" x-show="s.is_captain">队长</span>
-              <span class="badge bg-panel text-muted" x-show="s.team_id" x-text="teamName(s.team_id)"></span>
-              <button class="text-direhi/60 hover:text-direhi text-xs" x-show="me.is_admin" @click="adminRemoveSignup(s.account_id)">✕</button>
+            <div class="bg-panel2 rounded p-3">
+              <div class="flex items-center gap-2 mb-2">
+                <img class="avatar" :src="avatarOf(s.account_id)" onerror="this.src='/static/default-avatar.svg'"/>
+                <a :href="`/player/${s.account_id}`" class="flex-1 truncate text-sm font-bold hover:text-gold" x-text="nameOf(s.account_id)"></a>
+                <span class="badge bg-gold/20 text-goldhi" x-show="s.is_captain">队长</span>
+                <span class="badge bg-panel text-muted" x-show="s.team_id" x-text="teamName(s.team_id)"></span>
+                <button class="text-direhi/60 hover:text-direhi text-xs" x-show="me.is_admin" @click="adminRemoveSignup(s.account_id)">✕</button>
+              </div>
+              <div class="grid grid-cols-5 gap-1 text-center text-[11px]">
+                <div><div class="text-muted">天梯分</div><div class="font-bold gold-text" x-text="mmrOf(s.account_id) ?? '—'"></div></div>
+                <div><div class="text-muted">实力分</div><div class="font-bold" x-text="skillOf(s.account_id) ?? '—'"></div></div>
+                <div><div class="text-muted">身价</div><div class="font-bold text-gold" x-text="s.valuation ?? '—'"></div></div>
+                <div><div class="text-muted">擅长位</div><div class="font-bold" x-text="positionsOf(s.account_id)"></div></div>
+                <div><div class="text-muted">30天胜率</div><div class="font-bold" x-text="winrate30Of(s.account_id)"></div></div>
+              </div>
             </div>
           </template>
         </div>
@@ -131,7 +150,7 @@ function tournamentPage(tid) {
       {key:'signup', label:'报名'}, {key:'valuation', label:'身价'},
       {key:'auction', label:'队伍&拍卖'}, {key:'bracket', label:'赛程'},
     ],
-    poolQuery: '',
+    poolQuery: '', coverInput: '', win30: {},
 
     async init() {
       const [me, detail, stats, profiles] = await Promise.all([
@@ -145,8 +164,23 @@ function tournamentPage(tid) {
       const players = stats?.data?.players || [];
       this.playerMap = Object.fromEntries(players.map(p => [p.account_id, p]));
       this.allPlayers = players;
+      this._computeWin30(stats?.data?.matches || []);
       this._applyDetail(detail);
+      this.coverInput = this.t?.cover_url || '';
       this.loading = false;
+    },
+    _computeWin30(matches) {
+      const cutoff = Math.floor(Date.now()/1000) - 30*86400;
+      const w = {};
+      for (const m of matches) {
+        if ((m.start_ts||0) < cutoff) continue;
+        for (const p of m.players || []) {
+          if (!p.account_id) continue;
+          const r = w[p.account_id] || (w[p.account_id] = {w:0,n:0});
+          r.n++; if (p.win) r.w++;
+        }
+      }
+      this.win30 = w;
     },
     _applyDetail(d) {
       if (!d || d.error) { this.t = null; return; }
@@ -160,6 +194,11 @@ function tournamentPage(tid) {
     nameOf(aid){ return this.playerMap[aid]?.name || ('id_'+aid); },
     avatarOf(aid){ return this.profiles[aid]?.avatar_url || this.playerMap[aid]?.steam_avatar || '/static/default-avatar.svg'; },
     teamName(teamId){ return (this.teams.find(t=>t.id===teamId)||{}).name || ''; },
+    coverSrc(u){ if(!u) return ''; return (u.startsWith('http')||u.startsWith('/')) ? u : '/img/'+encodeURIComponent(u); },
+    mmrOf(aid){ return this.profiles[aid]?.mmr ?? null; },
+    skillOf(aid){ return this.playerMap[aid]?.skill_score ?? null; },
+    positionsOf(aid){ const p=this.profiles[aid]?.positions; return (p && p.length) ? p.join('/') : '—'; },
+    winrate30Of(aid){ const r=this.win30[aid]; return (r && r.n) ? Math.round(r.w/r.n*100)+'%' : '—'; },
     statusLabel(s){ return {registration:'报名中',auction:'拍卖中',bracket:'进行中',finished:'已结束'}[s]||s; },
     statusClass(s){ return {registration:'bg-radiant/20 text-radianthi',auction:'bg-gold/20 text-goldhi',bracket:'bg-gold/20 text-goldhi',finished:'bg-panel2 text-muted'}[s]||'bg-panel2 text-muted'; },
     get iSignedUp(){ return this.signups.some(s => s.account_id === this.me.account_id); },
@@ -180,6 +219,7 @@ function tournamentPage(tid) {
     async register(){ const j=await this._post(`/api/tournaments/${this.tid}/signup`); if(j.ok){ await this.reload(); this.flash('✓ 已报名'); } else this.flash('✗ '+(j.error||'失败')); },
     async withdraw(){ const j=await this._post(`/api/tournaments/${this.tid}/signup`,null,'DELETE'); if(j.ok){ await this.reload(); this.flash('✓ 已退赛'); } else this.flash('✗ '+(j.error||'失败')); },
     async setStatus(s){ const j=await this._post(`/api/tournaments/${this.tid}`,{status:s},'PATCH'); if(j.ok){ this.t=j.tournament; } else this.flash('✗ '+(j.error||'失败')); },
+    async saveCover(){ const j=await this._post(`/api/tournaments/${this.tid}`,{cover_url:this.coverInput},'PATCH'); if(j.ok){ this.t=j.tournament; this.flash('✓ 封面已更新'); } else this.flash('✗ '+(j.error||'失败')); },
     async adminAddSignup(aid){ const j=await this._post(`/api/tournaments/${this.tid}/signups`,{account_id:aid}); if(j.ok){ await this.reload(); this.poolQuery=''; } else this.flash('✗ '+(j.error||'失败')); },
     async adminRemoveSignup(aid){ if(!confirm('移除该报名选手？')) return; const j=await this._post(`/api/tournaments/${this.tid}/signups/${aid}`,null,'DELETE'); if(j.ok){ await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
   };

@@ -32,18 +32,19 @@ def get_tournament(tid: int) -> dict[str, Any] | None:
 
 
 def create_tournament(name: str, description: str | None = None,
-                      per_team_budget: int = 1000, created_by: int | None = None) -> dict[str, Any]:
+                      per_team_budget: int = 1000, created_by: int | None = None,
+                      cover_url: str | None = None) -> dict[str, Any]:
     with get_conn() as c:
         cur = c.execute(
-            "INSERT INTO tournaments (name, description, status, per_team_budget, created_by, created_at) "
-            "VALUES (?, ?, 'registration', ?, ?, ?)",
-            (name, description, per_team_budget, created_by, _now()),
+            "INSERT INTO tournaments (name, description, status, per_team_budget, cover_url, created_by, created_at) "
+            "VALUES (?, ?, 'registration', ?, ?, ?, ?)",
+            (name, description, per_team_budget, cover_url, created_by, _now()),
         )
         r = c.execute("SELECT * FROM tournaments WHERE id = ?", (cur.lastrowid,)).fetchone()
     return dict(r)
 
 
-_UPDATABLE = {"name", "description", "status", "per_team_budget"}
+_UPDATABLE = {"name", "description", "status", "per_team_budget", "cover_url"}
 
 
 def update_tournament(tid: int, **fields: Any) -> dict[str, Any] | None:

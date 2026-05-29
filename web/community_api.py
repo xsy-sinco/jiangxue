@@ -99,6 +99,18 @@ def api_update_profile():
             return jsonify({"error": "custom_tags 必须是数组，最多 10 个"}), 400
         if any(not isinstance(t, str) or len(t) > 20 for t in tags):
             return jsonify({"error": "每个 tag 最多 20 字"}), 400
+    if "mmr" in fields:
+        v = fields["mmr"]
+        if v in (None, ""):
+            fields["mmr"] = None
+        else:
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                return jsonify({"error": "MMR 必须是数字"}), 400
+            if not (0 <= v <= 20000):
+                return jsonify({"error": "MMR 超出合理范围"}), 400
+            fields["mmr"] = v
 
     # 头像 URL 只能是相对路径（防止用户写第三方 URL）
     fields.pop("avatar_url", None)

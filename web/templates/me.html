@@ -146,6 +146,12 @@
     </div>
 
     <div class="mb-4">
+      <label>天梯分 MMR</label>
+      <input type="number" x-model.number="form.mmr" min="0" max="20000"
+             placeholder="填你的天梯分，例如 5200"/>
+    </div>
+
+    <div class="mb-4">
       <label>个性签名（一句话）</label>
       <input type="text" x-model="form.signature" maxlength="100"
              placeholder="比如：3 号位选手 / 永远在路上的辅助 ..."/>
@@ -208,7 +214,7 @@ function me() {
     allPlayers: [],
     profiles: {},
 
-    form: { avatar_url: null, signature: '', bio: '', positions: [] },
+    form: { avatar_url: null, signature: '', bio: '', positions: [], mmr: null },
     tagsInput: '',
     saving: false,
     saveMsg: '',
@@ -229,6 +235,7 @@ function me() {
           this.form.signature  = meData.profile.signature || '';
           this.form.bio        = meData.profile.bio || '';
           this.form.positions  = meData.profile.positions || [];
+          this.form.mmr        = meData.profile.mmr ?? null;
           this.tagsInput       = (meData.profile.custom_tags || []).join(', ');
         }
       }
@@ -316,6 +323,7 @@ function me() {
             bio:       this.form.bio,
             positions: this.form.positions,
             custom_tags: tags,
+            mmr:       (this.form.mmr === '' || this.form.mmr === null) ? null : this.form.mmr,
           }),
         });
         const j = await r.json();

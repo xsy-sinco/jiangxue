@@ -50,6 +50,8 @@
       <div><label>每队预算</label><input type="number" x-model.number="form.per_team_budget" min="0"/></div>
     </div>
     <div class="mb-3"><label>简介（可选）</label><textarea x-model="form.description" rows="2" maxlength="500"></textarea></div>
+    <div class="mb-3"><label>封面图（把图片放进 data/，这里填文件名；或贴图片 URL）</label>
+      <input type="text" x-model="form.cover_url" placeholder="例如 江雪杯DOTA2比赛图片生成.png"/></div>
     <div class="flex items-center gap-3">
       <button @click="create()" :disabled="busy" class="btn btn-primary"><span x-text="busy?'创建中…':'创建'"></span></button>
       <span x-show="msg" :class="msg.startsWith('✓')?'text-radianthi text-sm':'text-direhi text-sm'" x-text="msg"></span>
@@ -64,14 +66,21 @@
     <p class="text-sm text-muted" x-show="!me.is_admin">等管理员创建赛事</p>
   </div>
 
-  <div class="space-y-3">
+  <div class="space-y-4">
     <template x-for="t in list" :key="t.id">
-      <a :href="`/tournament/${t.id}`" class="panel p-4 flex items-center justify-between hover:border-gold/40 transition block">
-        <div class="min-w-0">
-          <div class="font-bold text-lg truncate" x-text="t.name"></div>
-          <div class="text-xs text-muted mt-1" x-text="t.description || ''"></div>
+      <a :href="`/tournament/${t.id}`"
+         class="block rounded-xl overflow-hidden border border-border hover:border-gold/50 transition relative"
+         style="min-height:160px"
+         :style="t.cover_url
+           ? `background-image:linear-gradient(180deg, rgba(10,14,26,.15), rgba(10,14,26,.92)), url('${coverSrc(t.cover_url)}'); background-size:cover; background-position:center;`
+           : 'background:linear-gradient(135deg,#1c2338,#141a2a);'">
+        <div class="absolute inset-x-0 bottom-0 p-4 flex items-end justify-between gap-3">
+          <div class="min-w-0">
+            <div class="font-black text-xl truncate" :class="t.cover_url ? 'text-white' : 'gold-text'" x-text="t.name"></div>
+            <div class="text-xs text-muted mt-0.5 truncate" x-text="t.description || ''"></div>
+          </div>
+          <span class="badge shrink-0" :class="statusClass(t.status)" x-text="statusLabel(t.status)"></span>
         </div>
-        <span class="badge shrink-0 ml-3" :class="statusClass(t.status)" x-text="statusLabel(t.status)"></span>
       </a>
     </template>
   </div>
@@ -83,7 +92,7 @@ function tournamentsPage() {
     loading: true, busy: false, msg: '',
     me: { logged_in:false, is_admin:false },
     list: [],
-    form: { name:'', per_team_budget:1000, description:'' },
+    form: { name:'', per_team_budget:1000, description:'', cover_url:'' },
 
     async init() {
       const [me, list] = await Promise.all([
@@ -92,6 +101,7 @@ function tournamentsPage() {
       ]);
       this.me = me || {}; this.list = list || []; this.loading = false;
     },
+    coverSrc(u){ if(!u) return ''; return (u.startsWith('http')||u.startsWith('/')) ? u : '/img/'+encodeURIComponent(u); },
     statusLabel(s){ return {registration:'报名中', auction:'拍卖中', bracket:'进行中', finished:'已结束'}[s] || s; },
     statusClass(s){ return {
       registration:'bg-radiant/20 text-radianthi', auction:'bg-gold/20 text-goldhi',
@@ -104,7 +114,7 @@ function tournamentsPage() {
       try {
         const r = await fetch('/api/tournaments', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(this.form)});
         const j = await r.json();
-        if (j.ok) { this.list.unshift(j.tournament); this.form={name:'',per_team_budget:1000,description:''}; this.msg='✓ 已创建'; setTimeout(()=>this.msg='',2000); }
+        if (j.ok) { this.list.unshift(j.tournament); this.form={name:'',per_team_budget:1000,description:'',cover_url:''}; this.msg='✓ 已创建'; setTimeout(()=>this.msg='',2000); }
         else this.msg = '✗ ' + (j.error || '创建失败');
       } catch(e){ this.msg='✗ 网络错误'; } finally { this.busy=false; }
     },

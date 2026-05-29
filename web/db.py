@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     position      INTEGER,
     positions     TEXT,
     custom_tags   TEXT,
+    mmr           INTEGER,
     is_admin      INTEGER DEFAULT 0,
     created_at    INTEGER,
     updated_at    INTEGER
@@ -71,6 +72,7 @@ CREATE TABLE IF NOT EXISTS tournaments (
     description     TEXT,
     status          TEXT DEFAULT 'registration',  -- registration / auction / bracket / finished
     per_team_budget INTEGER DEFAULT 1000,
+    cover_url       TEXT,
     created_by      INTEGER,
     created_at      INTEGER
 );
@@ -119,7 +121,7 @@ CREATE INDEX IF NOT EXISTS idx_tmatches_tour ON tournament_matches(tournament_id
 """
 
 # 允许通过 POST /api/me/profile 更新的字段（用户名/密码走单独接口）
-EDITABLE_FIELDS = {"avatar_url", "display_name", "bio", "signature", "positions", "custom_tags"}
+EDITABLE_FIELDS = {"avatar_url", "display_name", "bio", "signature", "positions", "custom_tags", "mmr"}
 
 
 def init_db() -> None:
@@ -135,11 +137,13 @@ def init_db() -> None:
         for ddl in (
             "ALTER TABLE profiles ADD COLUMN positions TEXT",
             "ALTER TABLE profiles ADD COLUMN is_admin INTEGER DEFAULT 0",
+            "ALTER TABLE profiles ADD COLUMN mmr INTEGER",
+            "ALTER TABLE tournaments ADD COLUMN cover_url TEXT",
         ):
             try:
                 c.execute(ddl)
             except sqlite3.OperationalError:
-                pass  # 已存在
+                pass  # 已存在/表还没建
 
 
 @contextmanager

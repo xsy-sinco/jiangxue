@@ -52,6 +52,7 @@ def create_tournament():
     t = tdb.create_tournament(
         name=name, description=(p.get("description") or "").strip() or None,
         per_team_budget=budget, created_by=aid,
+        cover_url=(p.get("cover_url") or "").strip() or None,
     )
     return jsonify({"ok": True, "tournament": t})
 
@@ -71,6 +72,8 @@ def update_tournament(tid):
         fields["description"] = (p.get("description") or "").strip() or None
     if "per_team_budget" in p:
         fields["per_team_budget"] = _int(p.get("per_team_budget")) or 0
+    if "cover_url" in p:
+        fields["cover_url"] = (p.get("cover_url") or "").strip() or None
     if "status" in p:
         if p["status"] not in ("registration", "auction", "bracket", "finished"):
             return jsonify({"error": "状态不合法"}), 400

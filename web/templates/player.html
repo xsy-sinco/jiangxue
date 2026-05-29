@@ -158,6 +158,30 @@
         </div>
       </section>
 
+      <!-- ===== 近 14 天 ===== -->
+      <section class="panel p-5 mb-6">
+        <h2 class="font-bold text-gold mb-4 flex items-center gap-2">
+          <span class="w-1 h-4 bg-gold rounded"></span> 📅 近 14 天
+          <span class="text-xs text-muted font-normal" x-text="`(${recent14.total} 场)`"></span>
+        </h2>
+        <div class="grid grid-cols-3 gap-3 text-center">
+          <div>
+            <div class="text-xs text-muted">胜率</div>
+            <div class="text-3xl font-black mt-1"
+                 :class="!recent14.total ? 'text-muted' : recent14.winrate >= 55 ? 'text-radianthi' : recent14.winrate < 45 ? 'text-direhi' : 'gold-text'"
+                 x-text="recent14.total ? recent14.winrate + '%' : '—'"></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">胜场</div>
+            <div class="text-3xl font-black text-radianthi mt-1" x-text="recent14.wins"></div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">负场</div>
+            <div class="text-3xl font-black text-direhi mt-1" x-text="recent14.losses"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- ===== 荣誉墙 ===== -->
       <section class="panel p-5 mb-6" x-show="awardMeta.length">
         <h2 class="font-bold text-gold mb-4 flex items-center gap-2">
@@ -496,6 +520,16 @@ function playerPage(accountId) {
 
     get shownMatches() {
       return this.myMatches.slice(0, this.shownCount);
+    },
+
+    get recent14() {
+      const cutoff = Math.floor(Date.now() / 1000) - 14 * 86400;
+      let w = 0, n = 0;
+      for (const m of this.myMatches) {
+        if ((m.start_ts || 0) < cutoff) continue;
+        n++; if (m.myWin) w++;
+      }
+      return { wins: w, losses: n - w, total: n, winrate: n ? Math.round(w / n * 1000) / 10 : 0 };
     },
 
     positionLabel(pos) {

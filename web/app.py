@@ -22,12 +22,13 @@ from src import avatars
 from src.api import OpenDotaClient
 from src.heroes import HeroIndex
 from src.serialize import serialize
-from src.stats import aggregate
+from src.stats import _is_ghost_match, aggregate
 from src.steam_api import SteamDotaClient
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config.json"
 CACHE_JSON = ROOT / "data" / "aggregate.json"
+MATCHES_TXT = ROOT / "matches.txt"
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -108,6 +109,69 @@ def _get_league_name(league_id: int) -> str:
     return ""
 
 
+def _read_manual_match_ids() -> set[int]:
+    """Read optional matches.txt fallback IDs."""
+    if not MATCHES_TXT.exists():
+        return set()
+    ids: set[int] = set()
+    for raw in MATCHES_TXT.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        try:
+            ids.add(int(line))
+        except ValueError:
+            continue
+    return ids
+
+
+def _cache_dirs(primary: Path) -> list[Path]:
+    """Return cache directories to read from, keeping the configured path first."""
+    dirs = [primary]
+    # Older local runs in this workspace wrote match details under data/data/matches.
+    legacy = ROOT / "data" / "data" / "matches"
+    if legacy != primary and legacy.exists():
+        dirs.append(legacy)
+    return dirs
+
+
+def _cached_match_files(cache_dirs: list[Path]) -> dict[int, Path]:
+    files: dict[int, Path] = {}
+    for cache_dir in cache_dirs:
+        if not cache_dir.exists():
+            continue
+        for file in cache_dir.glob("*.json"):
+            if file.name.startswith("_"):
+                continue
+            try:
+                mid = int(file.stem)
+            except ValueError:
+                continue
+            files.setdefault(mid, file)
+    return files
+
+
+def _known_match_ids() -> set[int]:
+    with _state_lock:
+        data = _state.get("data")
+        ids = {
+            int(m["match_id"])
+            for m in (data or {}).get("matches", [])
+            if m.get("match_id")
+        }
+    if CACHE_JSON.exists():
+        try:
+            cached_data = json.loads(CACHE_JSON.read_text(encoding="utf-8"))
+        except Exception:
+            cached_data = {}
+        ids.update(
+            int(m["match_id"])
+            for m in cached_data.get("matches", [])
+            if m.get("match_id")
+        )
+    return ids
+
+
 def _do_refresh() -> None:
     """后台跑：发现 → 拉详情 → 聚合 → 序列化。把结果写入 _state。"""
     try:
@@ -117,11 +181,14 @@ def _do_refresh() -> None:
             raise RuntimeError("config.json 缺少 league_id")
 
         cache_dir = ROOT / cfg.get("cache_dir", "data/matches")
+        cache_dirs = _cache_dirs(cache_dir)
         client = OpenDotaClient(
             cache_dir=cache_dir,
             api_key=cfg.get("api_key", ""),
             rate_limit_per_minute=cfg.get("rate_limit_per_minute", 55),
         )
+
+        known_ids = _known_match_ids()
 
         _set_progress("heroes", message="加载英雄常量")
         hero_index = HeroIndex(client.get_heroes())
@@ -131,36 +198,102 @@ def _do_refresh() -> None:
 
         _set_progress("discover", message="通过 Steam 发现比赛 ID")
         steam_key = cfg.get("steam_api_key", "").strip()
-        match_ids: set[int] = set()
+        discovered_ids: set[int] = set()
         if steam_key:
             steam = SteamDotaClient(steam_key)
             for mid in steam.get_match_ids_by_league(league_id):
-                match_ids.add(mid)
+                discovered_ids.add(mid)
         # 也叠加 OpenDota 接口和 team_members 反查（容错）
         try:
             for m in client.get_league_matches(league_id):
-                if m.get("match_id"):
-                    match_ids.add(m["match_id"])
+                mid = m.get("match_id")
+                if mid:
+                    discovered_ids.add(int(mid))
         except Exception:
             pass
         for aid in cfg.get("team_members", []):
             try:
-                for m in client.get_player_matches(int(aid), league_id=league_id):
-                    if m.get("match_id"):
-                        match_ids.add(m["match_id"])
+                for m in client.get_player_matches(int(aid), league_id=league_id, limit=300):
+                    mid = m.get("match_id")
+                    if mid:
+                        discovered_ids.add(int(mid))
             except Exception:
                 pass
+        discovered_ids.update(_read_manual_match_ids())
+
+        cached_files = _cached_match_files(cache_dirs)
+        skipped_cached_ids: set[int] = set()
+        for mid, file in cached_files.items():
+            if mid in discovered_ids or mid in known_ids:
+                continue
+            try:
+                cached_match = json.loads(file.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if cached_match.get("leagueid") != league_id:
+                continue
+            if _is_ghost_match(cached_match):
+                skipped_cached_ids.add(mid)
+                continue
+            discovered_ids.add(mid)
+        for mid in discovered_ids & set(cached_files):
+            if mid in known_ids:
+                continue
+            try:
+                cached_match = json.loads(cached_files[mid].read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if cached_match.get("leagueid") == league_id and _is_ghost_match(cached_match):
+                skipped_cached_ids.add(mid)
+
+        match_ids = discovered_ids - known_ids - skipped_cached_ids
+
+        # 如果没有新比赛，直接加载现有缓存
+        if not match_ids:
+            _set_progress("done", current=0, total=0, message="无新比赛")
+            if CACHE_JSON.exists():
+                data = json.loads(CACHE_JSON.read_text(encoding="utf-8"))
+                with _state_lock:
+                    _state["data"] = data
+                    _state["updated_at"] = int(CACHE_JSON.stat().st_mtime)
+                    _state["error"] = None
+            return
 
         sorted_ids = sorted(match_ids, reverse=True)
         total = len(sorted_ids)
-        details = []
+        new_details = {}
         for i, mid in enumerate(sorted_ids, 1):
             _set_progress("details", current=i, total=total,
-                          message=f"拉取比赛详情 {i}/{total}")
-            details.append(client.get_match(mid))
+                          message=f"拉取新比赛详情 {i}/{total}")
+            if mid in cached_files:
+                new_details[mid] = json.loads(cached_files[mid].read_text(encoding="utf-8"))
+            else:
+                new_details[mid] = client.get_match(mid)
 
-        _set_progress("aggregate", message="聚合统计")
-        result = aggregate(details, hero_index, cfg.get("player_aliases"), league_id=league_id)
+        # 合并新比赛和缓存中的旧比赛
+        all_match_ids = known_ids | discovered_ids
+
+        # 从缓存目录读取所有缓存的比赛详情
+        all_details = []
+        all_ids_sorted = sorted(all_match_ids, reverse=True)
+        total_all = len(all_ids_sorted)
+        for i, mid in enumerate(all_ids_sorted, 1):
+            # 新比赛的详情已经拉取了，直接用
+            if mid in match_ids:
+                detail = new_details.get(mid)
+                if detail:
+                    all_details.append(detail)
+            else:
+                # 旧比赛从缓存文件读取
+                try:
+                    cache_file = cached_files.get(mid)
+                    if cache_file:
+                        all_details.append(json.loads(cache_file.read_text(encoding="utf-8")))
+                except Exception:
+                    pass
+
+        _set_progress("aggregate", message=f"聚合统计 ({len(all_details)} 场)")
+        result = aggregate(all_details, hero_index, cfg.get("player_aliases"), league_id=league_id)
         steam_avatars = avatars.resolve(list(result["players"].keys()), steam_key)
         data = serialize(result, hero_index, league_id, league_name, steam_avatars=steam_avatars)
 

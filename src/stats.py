@@ -9,6 +9,9 @@ from typing import Any, Iterable
 from .api import ANONYMOUS_ACCOUNT_ID
 from .heroes import HeroIndex
 
+# 幽灵对局阈值：双方总人头（radiant_score + dire_score）低于此值视为开局即退的废局，直接丢弃
+GHOST_MIN_TOTAL_KILLS = 6
+
 
 def _is_radiant(player: dict[str, Any]) -> bool:
     # 优先用 OpenDota 提供的字段，否则按 player_slot 高位判断
@@ -155,6 +158,18 @@ def aggregate(
         skipped_league = before - len(matches)
         if skipped_league:
             print(f"  [过滤] 跳过 {skipped_league} 场非 league={league_id} 的比赛")
+
+    # 剔除"幽灵对局"：开局后玩家基本都退了的局。没有干净的字段能判定
+    # （实测 leaver_status 全员退出=0 场），用总人头兜底：双方总击杀 < 阈值即丢弃。
+    # 这类对局完全不计入统计（总对局/玩家/英雄/对局列表都不出现）。
+    before = len(matches)
+    matches = [
+        m for m in matches
+        if (m.get("radiant_score", 0) or 0) + (m.get("dire_score", 0) or 0) >= GHOST_MIN_TOTAL_KILLS
+    ]
+    skipped_ghost = before - len(matches)
+    if skipped_ghost:
+        print(f"  [过滤] 跳过 {skipped_ghost} 场幽灵对局（双方总人头 < {GHOST_MIN_TOTAL_KILLS}）")
 
     for m in matches:
         radiant_win = bool(m.get("radiant_win"))

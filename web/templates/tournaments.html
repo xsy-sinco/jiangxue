@@ -76,6 +76,8 @@
     <template x-for="t in list" :key="t.id">
       <a :href="`/tournament/${t.id}`"
          class="block rounded-xl overflow-hidden border border-border hover:border-gold/50 transition relative bg-panel2">
+        <button x-show="me.is_admin" @click.prevent.stop="del(t.id)"
+                class="absolute top-2 right-2 z-10 bg-black/50 hover:bg-dire/80 text-white text-xs rounded px-2 py-1 transition">删除</button>
         <template x-if="t.cover_url">
           <img :src="coverSrc(t.cover_url)" loading="lazy" class="w-full h-40 object-cover" />
         </template>
@@ -116,6 +118,15 @@ function tournamentsPage() {
         const j = await fetch('/api/tournaments/cover', {method:'POST', body:fd}).then(r=>r.json());
         if (j.ok) this.form.cover_url = j.url; else this.msg = '✗ ' + (j.error || '上传失败');
       } catch(e){ this.msg = '✗ 网络错误'; } finally { this.coverBusy = false; }
+    },
+    async del(id){
+      const t = this.list.find(x=>x.id===id);
+      if (!confirm(`确定删除赛事「${t?.name||''}」？报名/队伍/赛程都会一起删除，不可恢复。`)) return;
+      try {
+        const j = await fetch(`/api/tournaments/${id}`, {method:'DELETE'}).then(r=>r.json());
+        if (j.ok) this.list = this.list.filter(x=>x.id!==id);
+        else alert(j.error || '删除失败');
+      } catch(e){ alert('网络错误'); }
     },
     statusLabel(s){ return {registration:'报名中', auction:'拍卖中', bracket:'进行中', finished:'已结束'}[s] || s; },
     statusClass(s){ return {

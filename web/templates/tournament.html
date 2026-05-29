@@ -69,9 +69,9 @@
             <span class="text-xs text-muted shrink-0">封面：</span>
             <input type="file" accept="image/*" @change="uploadCover($event)"/>
             <span class="text-xs text-muted" x-show="coverBusy">上传中…</span>
-            <span class="text-xs text-muted">或</span>
-            <input type="text" x-model="coverInput" placeholder="图片URL" class="flex-1 min-w-[120px]"/>
-            <button class="btn btn-ghost" @click="saveCover()">保存URL</button>
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-ghost text-direhi" style="border-color:rgba(232,90,69,.4)" @click="del()">🗑 删除赛事</button>
           </div>
         </div>
       </header>
@@ -155,7 +155,7 @@ function tournamentPage(tid) {
       {key:'signup', label:'报名'}, {key:'valuation', label:'身价'},
       {key:'auction', label:'队伍&拍卖'}, {key:'bracket', label:'赛程'},
     ],
-    poolQuery: '', coverInput: '', coverBusy: false, win30: {},
+    poolQuery: '', coverBusy: false, win30: {},
 
     async init() {
       const [me, detail, stats, profiles] = await Promise.all([
@@ -171,7 +171,6 @@ function tournamentPage(tid) {
       this.allPlayers = players;
       this._computeWin30(stats?.data?.matches || []);
       this._applyDetail(detail);
-      this.coverInput = this.t?.cover_url || '';
       this.loading = false;
     },
     _computeWin30(matches) {
@@ -224,7 +223,6 @@ function tournamentPage(tid) {
     async register(){ const j=await this._post(`/api/tournaments/${this.tid}/signup`); if(j.ok){ await this.reload(); this.flash('✓ 已报名'); } else this.flash('✗ '+(j.error||'失败')); },
     async withdraw(){ const j=await this._post(`/api/tournaments/${this.tid}/signup`,null,'DELETE'); if(j.ok){ await this.reload(); this.flash('✓ 已退赛'); } else this.flash('✗ '+(j.error||'失败')); },
     async setStatus(s){ const j=await this._post(`/api/tournaments/${this.tid}`,{status:s},'PATCH'); if(j.ok){ this.t=j.tournament; } else this.flash('✗ '+(j.error||'失败')); },
-    async saveCover(){ const j=await this._post(`/api/tournaments/${this.tid}`,{cover_url:this.coverInput},'PATCH'); if(j.ok){ this.t=j.tournament; this.flash('✓ 封面已更新'); } else this.flash('✗ '+(j.error||'失败')); },
     async uploadCover(e){
       const file=e.target.files[0]; if(!file) return;
       this.coverBusy=true;
@@ -233,8 +231,13 @@ function tournamentPage(tid) {
         const up=await fetch('/api/tournaments/cover',{method:'POST',body:fd}).then(r=>r.json());
         if(!up.ok){ this.flash('✗ '+(up.error||'上传失败')); return; }
         const j=await this._post(`/api/tournaments/${this.tid}`,{cover_url:up.url},'PATCH');
-        if(j.ok){ this.t=j.tournament; this.coverInput=up.url; this.flash('✓ 封面已更新'); } else this.flash('✗ '+(j.error||'失败'));
+        if(j.ok){ this.t=j.tournament; this.flash('✓ 封面已更新'); } else this.flash('✗ '+(j.error||'失败'));
       } catch(err){ this.flash('✗ 网络错误'); } finally { this.coverBusy=false; }
+    },
+    async del(){
+      if(!confirm(`确定删除赛事「${this.t.name}」？报名/队伍/赛程都会一起删除，不可恢复。`)) return;
+      const j=await this._post(`/api/tournaments/${this.tid}`,null,'DELETE');
+      if(j.ok){ window.location.href='/tournaments'; } else this.flash('✗ '+(j.error||'删除失败'));
     },
     async adminAddSignup(aid){ const j=await this._post(`/api/tournaments/${this.tid}/signups`,{account_id:aid}); if(j.ok){ await this.reload(); this.poolQuery=''; } else this.flash('✗ '+(j.error||'失败')); },
     async adminRemoveSignup(aid){ if(!confirm('移除该报名选手？')) return; const j=await this._post(`/api/tournaments/${this.tid}/signups/${aid}`,null,'DELETE'); if(j.ok){ await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },

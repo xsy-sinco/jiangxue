@@ -32,7 +32,36 @@ def api_me():
         "account_id": aid,
         "username": username,
         "profile": db.get_profile(aid),
+        "is_admin": auth.is_admin(aid),
     })
+
+
+@bp.route("/api/admins")
+def api_list_admins():
+    err = auth.require_admin()
+    if err:
+        return err
+    profiles = db.get_all_profiles()
+    out = []
+    for a in db.list_admin_account_ids():
+        p = profiles.get(a) or {}
+        out.append({"account_id": a, "username": p.get("username"), "display_name": p.get("display_name")})
+    return jsonify(out)
+
+
+@bp.route("/api/admins", methods=["POST"])
+def api_set_admin():
+    """管理员给某账号开/撤管理员权限。"""
+    err = auth.require_admin()
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    try:
+        target = int(payload.get("account_id"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "account_id 必须是数字"}), 400
+    db.set_admin(target, bool(payload.get("grant", True)))
+    return jsonify({"ok": True})
 
 
 @bp.route("/api/profiles")

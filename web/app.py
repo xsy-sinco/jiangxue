@@ -49,9 +49,10 @@ except ImportError:
     pass  # 服务器没装就跳过，不致命
 
 # 注册社区蓝图
-from web import auth, community_api, db  # noqa: E402
+from web import auth, community_api, db, tournaments_api  # noqa: E402
 app.register_blueprint(auth.bp)
 app.register_blueprint(community_api.bp)
+app.register_blueprint(tournaments_api.bp)
 db.init_db()
 
 # ---------- 状态：进度 + 数据 ----------
@@ -224,6 +225,16 @@ def events_page():
 @app.route("/highlights")
 def highlights_page():
     return render_template("highlights.html", active="highlights")
+
+
+@app.route("/tournaments")
+def tournaments_page():
+    return render_template("tournaments.html", active="tournaments")
+
+
+@app.route("/tournament/<int:tid>")
+def tournament_page(tid: int):
+    return render_template("tournament.html", active="tournaments", tournament_id=tid)
 
 
 @app.route("/api/stats")

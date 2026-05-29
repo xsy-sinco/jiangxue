@@ -13,7 +13,9 @@ Session 字段：
 
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 
 from flask import Blueprint, jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -23,6 +25,24 @@ from web import db
 bp = Blueprint("auth", __name__)
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_一-鿿]{2,20}$")
+
+_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.json"
+
+
+def _bootstrap_admin_ids() -> set[int]:
+    """config.json 里的 admins 名单（引导超管，防止把自己锁在外面）。每次读，量很小。"""
+    try:
+        cfg = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+        return {int(x) for x in cfg.get("admins", [])}
+    except Exception:
+        return set()
+
+
+def is_admin(account_id: int | None) -> bool:
+    """管理员判定：config 引导名单 或 profiles.is_admin==1。"""
+    if account_id is None:
+        return False
+    return account_id in _bootstrap_admin_ids() or db.is_account_admin(account_id)
 
 
 @bp.route("/api/register", methods=["POST"])
@@ -93,4 +113,14 @@ def require_login():
     aid, _ = current_user()
     if aid is None:
         return jsonify({"error": "未登录"}), 401
+    return None
+
+
+def require_admin():
+    """未登录返回 401；已登录但非管理员返回 403；管理员返回 None。"""
+    aid, _ = current_user()
+    if aid is None:
+        return jsonify({"error": "未登录"}), 401
+    if not is_admin(aid):
+        return jsonify({"error": "需要管理员权限"}), 403
     return None

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>赛事详情 · 江雪杯</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0e1a'/><text x='50' y='72' font-size='66' text-anchor='middle' fill='%23c8aa6e'>%F0%9F%8F%86</text></svg>" />
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: {
+      bg: '#0a0e1a', panel: '#141a2a', panel2: '#1c2338', border: '#2a3148',
+      gold: '#c8aa6e', goldhi: '#f0d486', radiant: '#92a629', radianthi: '#b5cf3b',
+      dire: '#c23c2a', direhi: '#e85a45', muted: '#7a8499',
+    }}}};
+  </script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+  <style>
+    body { background: linear-gradient(180deg,#0a0e1a,#06090f); color:#e8eaed; min-height:100vh;
+      font-family:"Noto Sans SC","Microsoft YaHei",system-ui,sans-serif; }
+    .panel { background: linear-gradient(180deg, rgba(28,35,56,.85), rgba(20,26,42,.85));
+      border:1px solid #2a3148; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.3); }
+    .gold-text { background: linear-gradient(180deg,#f0d486,#c8aa6e); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    input, select { background:#0a0e1a; border:1px solid #2a3148; border-radius:6px; padding:6px 10px; color:#e8eaed; font-size:14px; }
+    input:focus, select:focus { border-color:#c8aa6e; outline:none; }
+    .btn { padding:5px 12px; border-radius:6px; font-weight:700; font-size:13px; cursor:pointer; border:0; transition:all .15s; }
+    .btn-primary { background:#c8aa6e; color:#0a0e1a; } .btn-primary:hover:not(:disabled){ background:#f0d486; }
+    .btn-ghost { background:transparent; color:#7a8499; border:1px solid #2a3148; } .btn-ghost:hover{ color:#f0d486; border-color:#c8aa6e; }
+    .tab-active { color:#f0d486; border-bottom:2px solid #c8aa6e; }
+    .avatar { width:32px; height:32px; border-radius:50%; object-fit:cover; }
+    .badge { font-size:11px; padding:2px 8px; border-radius:999px; font-weight:700; }
+  </style>
+</head>
+<body class="antialiased">
+
+{% include "_nav.html" %}
+
+<div x-data="tournamentPage({{ tournament_id }})" x-init="init()" class="max-w-5xl mx-auto px-4 py-6">
+
+  <div x-show="loading" class="text-center py-12 text-muted">加载中…</div>
+  <div x-show="!loading && !t" class="panel p-12 text-center text-muted">找不到该赛事 · <a href="/tournaments" class="text-gold">返回列表</a></div>
+
+  <template x-if="t">
+    <div>
+      <!-- 头部 -->
+      <header class="panel p-5 mb-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <a href="/tournaments" class="text-xs text-muted hover:text-gold">← 全部赛事</a>
+            <h1 class="text-2xl font-black gold-text mt-1 truncate" x-text="t.name"></h1>
+            <p class="text-sm text-muted mt-1" x-show="t.description" x-text="t.description"></p>
+          </div>
+          <span class="badge shrink-0" :class="statusClass(t.status)" x-text="statusLabel(t.status)"></span>
+        </div>
+        <!-- 管理员：状态流转 -->
+        <div class="mt-3 flex items-center gap-2 flex-wrap" x-show="me.is_admin">
+          <span class="text-xs text-muted">管理员 · 状态：</span>
+          <template x-for="s in ['registration','auction','bracket','finished']" :key="s">
+            <button class="btn" :class="t.status===s?'btn-primary':'btn-ghost'" @click="setStatus(s)" x-text="statusLabel(s)"></button>
+          </template>
+          <span class="text-xs text-muted ml-2">每队预算 <span class="text-gold" x-text="t.per_team_budget"></span></span>
+        </div>
+      </header>
+
+      <!-- Tabs -->
+      <nav class="flex gap-1 mb-4 border-b border-border text-sm">
+        <template x-for="tb in tabs" :key="tb.key">
+          <button @click="tab=tb.key" class="px-4 py-2.5 font-bold transition"
+                  :class="tab===tb.key?'tab-active':'text-muted hover:text-white'" x-text="tb.label"></button>
+        </template>
+      </nav>
+
+      <!-- ===== 报名 ===== -->
+      <section x-show="tab==='signup'" class="panel p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="font-bold text-gold">报名选手 <span class="text-muted font-normal" x-text="`(${signups.length})`"></span></h2>
+          <div x-show="me.logged_in && t.status==='registration'">
+            <button class="btn btn-primary" x-show="!iSignedUp" @click="register()">我要报名</button>
+            <button class="btn btn-ghost" x-show="iSignedUp" @click="withdraw()">退赛</button>
+          </div>
+          <p class="text-xs text-muted" x-show="!me.logged_in"><a href="/me" class="text-gold">登录</a>后可报名</p>
+        </div>
+
+        <!-- 管理员加人 -->
+        <div class="mb-4 p-3 bg-panel2 rounded" x-show="me.is_admin">
+          <div class="text-xs text-muted mb-2">管理员 · 添加报名选手</div>
+          <input type="text" x-model="poolQuery" placeholder="搜玩家昵称 / account_id…" class="w-full mb-2"/>
+          <div class="max-h-44 overflow-y-auto space-y-1" x-show="poolQuery">
+            <template x-for="p in poolCandidates" :key="p.account_id">
+              <div class="flex items-center gap-2 text-sm py-1">
+                <img class="avatar" :src="avatarOf(p.account_id)" onerror="this.src='/static/default-avatar.svg'"/>
+                <span class="flex-1 truncate" x-text="p.name"></span>
+                <button class="btn btn-ghost text-xs" @click="adminAddSignup(p.account_id)">＋ 加入</button>
+              </div>
+            </template>
+            <div x-show="poolCandidates.length===0" class="text-xs text-muted py-2">没有匹配的未报名玩家</div>
+          </div>
+        </div>
+
+        <div x-show="signups.length===0" class="text-sm text-muted text-center py-6">还没有人报名</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <template x-for="s in signups" :key="s.account_id">
+            <div class="flex items-center gap-2 bg-panel2 rounded p-2">
+              <img class="avatar" :src="avatarOf(s.account_id)" onerror="this.src='/static/default-avatar.svg'"/>
+              <a :href="`/player/${s.account_id}`" class="flex-1 truncate text-sm hover:text-gold" x-text="nameOf(s.account_id)"></a>
+              <span class="badge bg-gold/20 text-goldhi" x-show="s.is_captain">队长</span>
+              <span class="badge bg-panel text-muted" x-show="s.team_id" x-text="teamName(s.team_id)"></span>
+              <button class="text-direhi/60 hover:text-direhi text-xs" x-show="me.is_admin" @click="adminRemoveSignup(s.account_id)">✕</button>
+            </div>
+          </template>
+        </div>
+        <p x-show="msg" class="mt-3 text-sm" :class="msg.startsWith('✓')?'text-radianthi':'text-direhi'" x-text="msg"></p>
+      </section>
+
+      <!-- ===== 其余 tab：阶段 3/4 上线 ===== -->
+      <section x-show="tab==='valuation'" class="panel p-8 text-center text-muted">选手身价（管理员设定）· 下一步上线</section>
+      <section x-show="tab==='auction'" class="panel p-8 text-center text-muted">队伍 &amp; 选马拍卖 · 下一步上线</section>
+      <section x-show="tab==='bracket'" class="panel p-8 text-center text-muted">赛程对阵（TI 式）· 下一步上线</section>
+    </div>
+  </template>
+</div>
+
+<script>
+function tournamentPage(tid) {
+  return {
+    tid, loading: true, msg: '',
+    me: { logged_in:false, is_admin:false, account_id:null },
+    t: null, signups: [], teams: [], matches: [],
+    playerMap: {}, profiles: {},
+    tab: 'signup',
+    tabs: [
+      {key:'signup', label:'报名'}, {key:'valuation', label:'身价'},
+      {key:'auction', label:'队伍&拍卖'}, {key:'bracket', label:'赛程'},
+    ],
+    poolQuery: '',
+
+    async init() {
+      const [me, detail, stats, profiles] = await Promise.all([
+        fetch('/api/me').then(r=>r.json()).catch(()=>({})),
+        fetch(`/api/tournaments/${this.tid}`).then(r=>r.json()).catch(()=>null),
+        fetch('/api/stats').then(r=>r.json()).catch(()=>({})),
+        fetch('/api/profiles').then(r=>r.json()).catch(()=>({})),
+      ]);
+      this.me = me || {};
+      this.profiles = profiles || {};
+      const players = stats?.data?.players || [];
+      this.playerMap = Object.fromEntries(players.map(p => [p.account_id, p]));
+      this.allPlayers = players;
+      this._applyDetail(detail);
+      this.loading = false;
+    },
+    _applyDetail(d) {
+      if (!d || d.error) { this.t = null; return; }
+      this.t = d.tournament; this.signups = d.signups || []; this.teams = d.teams || []; this.matches = d.matches || [];
+    },
+    async reload() {
+      const d = await fetch(`/api/tournaments/${this.tid}`).then(r=>r.json()).catch(()=>null);
+      this._applyDetail(d);
+    },
+
+    nameOf(aid){ return this.playerMap[aid]?.name || ('id_'+aid); },
+    avatarOf(aid){ return this.profiles[aid]?.avatar_url || this.playerMap[aid]?.steam_avatar || '/static/default-avatar.svg'; },
+    teamName(teamId){ return (this.teams.find(t=>t.id===teamId)||{}).name || ''; },
+    statusLabel(s){ return {registration:'报名中',auction:'拍卖中',bracket:'进行中',finished:'已结束'}[s]||s; },
+    statusClass(s){ return {registration:'bg-radiant/20 text-radianthi',auction:'bg-gold/20 text-goldhi',bracket:'bg-gold/20 text-goldhi',finished:'bg-panel2 text-muted'}[s]||'bg-panel2 text-muted'; },
+    get iSignedUp(){ return this.signups.some(s => s.account_id === this.me.account_id); },
+    get poolCandidates(){
+      const q = (this.poolQuery||'').trim().toLowerCase();
+      if (!q) return [];
+      const signed = new Set(this.signups.map(s=>s.account_id));
+      return (this.allPlayers||[]).filter(p => !signed.has(p.account_id) &&
+        ((p.name||'').toLowerCase().includes(q) || String(p.account_id).includes(q))).slice(0,30);
+    },
+
+    async _post(url, body, method='POST') {
+      const r = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):undefined});
+      return r.json().catch(()=>({}));
+    },
+    flash(m){ this.msg=m; setTimeout(()=>this.msg='',2500); },
+
+    async register(){ const j=await this._post(`/api/tournaments/${this.tid}/signup`); if(j.ok){ await this.reload(); this.flash('✓ 已报名'); } else this.flash('✗ '+(j.error||'失败')); },
+    async withdraw(){ const j=await this._post(`/api/tournaments/${this.tid}/signup`,null,'DELETE'); if(j.ok){ await this.reload(); this.flash('✓ 已退赛'); } else this.flash('✗ '+(j.error||'失败')); },
+    async setStatus(s){ const j=await this._post(`/api/tournaments/${this.tid}`,{status:s},'PATCH'); if(j.ok){ this.t=j.tournament; } else this.flash('✗ '+(j.error||'失败')); },
+    async adminAddSignup(aid){ const j=await this._post(`/api/tournaments/${this.tid}/signups`,{account_id:aid}); if(j.ok){ await this.reload(); this.poolQuery=''; } else this.flash('✗ '+(j.error||'失败')); },
+    async adminRemoveSignup(aid){ if(!confirm('移除该报名选手？')) return; const j=await this._post(`/api/tournaments/${this.tid}/signups/${aid}`,null,'DELETE'); if(j.ok){ await this.reload(); } else this.flash('✗ '+(j.error||'失败')); },
+  };
+}
+</script>
+</body></html>

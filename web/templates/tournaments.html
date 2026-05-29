@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>赛事 · 江雪杯</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a0e1a'/><text x='50' y='72' font-size='66' text-anchor='middle' fill='%23c8aa6e'>%F0%9F%8F%86</text></svg>" />
+  <script src="/static/vendor/tailwind.js"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: {
+      bg: '#0a0e1a', panel: '#141a2a', panel2: '#1c2338', border: '#2a3148',
+      gold: '#c8aa6e', goldhi: '#f0d486', radiant: '#92a629', radianthi: '#b5cf3b',
+      dire: '#c23c2a', direhi: '#e85a45', muted: '#7a8499',
+    }}}};
+  </script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+  <style>
+    body { background: linear-gradient(180deg, #0a0e1a, #06090f); color: #e8eaed; min-height: 100vh;
+      font-family: "Noto Sans SC","Microsoft YaHei",system-ui,sans-serif; }
+    .panel { background: linear-gradient(180deg, rgba(28,35,56,.85), rgba(20,26,42,.85));
+      border: 1px solid #2a3148; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .gold-text { background: linear-gradient(180deg,#f0d486,#c8aa6e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    input, textarea, select { background:#0a0e1a; border:1px solid #2a3148; border-radius:6px; padding:8px 12px; color:#e8eaed; font-size:14px; width:100%; }
+    input:focus, textarea:focus, select:focus { border-color:#c8aa6e; outline:none; }
+    label { display:block; font-size:12px; color:#7a8499; margin-bottom:4px; }
+    .btn { padding:6px 14px; border-radius:6px; font-weight:700; font-size:13px; transition:all .15s; cursor:pointer; border:0; }
+    .btn-primary { background:#c8aa6e; color:#0a0e1a; } .btn-primary:hover:not(:disabled){ background:#f0d486; } .btn-primary:disabled{ opacity:.5; cursor:not-allowed; }
+    .badge { font-size:11px; padding:2px 8px; border-radius:999px; font-weight:700; }
+  </style>
+</head>
+<body class="antialiased">
+
+{% include "_nav.html" %}
+
+<div x-data="tournamentsPage()" x-init="init()" class="max-w-4xl mx-auto px-4 py-6">
+
+  <header class="panel p-6 mb-6 flex items-center gap-4">
+    <span class="text-5xl">🏆</span>
+    <div>
+      <h1 class="text-3xl font-black gold-text">赛事</h1>
+      <p class="text-sm text-muted mt-1">报名 · 选马拍卖 · 赛程</p>
+    </div>
+  </header>
+
+  <!-- 管理员：新建赛事 -->
+  <div class="panel p-5 mb-6" x-show="me.is_admin">
+    <h3 class="text-sm font-bold text-gold mb-3">✚ 新建赛事</h3>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+      <div class="md:col-span-2"><label>赛事名</label><input type="text" x-model="form.name" maxlength="80" placeholder="例如：江雪杯第一届内战赛"/></div>
+      <div><label>每队预算</label><input type="number" x-model.number="form.per_team_budget" min="0"/></div>
+    </div>
+    <div class="mb-3"><label>简介（可选）</label><textarea x-model="form.description" rows="2" maxlength="500"></textarea></div>
+    <div class="flex items-center gap-3">
+      <button @click="create()" :disabled="busy" class="btn btn-primary"><span x-text="busy?'创建中…':'创建'"></span></button>
+      <span x-show="msg" :class="msg.startsWith('✓')?'text-radianthi text-sm':'text-direhi text-sm'" x-text="msg"></span>
+    </div>
+  </div>
+
+  <div x-show="loading" class="text-center py-12 text-muted">加载中…</div>
+  <div x-show="!loading && list.length===0" class="panel p-12 text-center">
+    <div class="text-6xl mb-3">🏆</div>
+    <h3 class="text-lg font-bold text-gold mb-2">还没有赛事</h3>
+    <p class="text-sm text-muted" x-show="me.is_admin">用上面的表单创建第一个赛事</p>
+    <p class="text-sm text-muted" x-show="!me.is_admin">等管理员创建赛事</p>
+  </div>
+
+  <div class="space-y-3">
+    <template x-for="t in list" :key="t.id">
+      <a :href="`/tournament/${t.id}`" class="panel p-4 flex items-center justify-between hover:border-gold/40 transition block">
+        <div class="min-w-0">
+          <div class="font-bold text-lg truncate" x-text="t.name"></div>
+          <div class="text-xs text-muted mt-1" x-text="t.description || ''"></div>
+        </div>
+        <span class="badge shrink-0 ml-3" :class="statusClass(t.status)" x-text="statusLabel(t.status)"></span>
+      </a>
+    </template>
+  </div>
+</div>
+
+<script>
+function tournamentsPage() {
+  return {
+    loading: true, busy: false, msg: '',
+    me: { logged_in:false, is_admin:false },
+    list: [],
+    form: { name:'', per_team_budget:1000, description:'' },
+
+    async init() {
+      const [me, list] = await Promise.all([
+        fetch('/api/me').then(r=>r.json()).catch(()=>({})),
+        fetch('/api/tournaments').then(r=>r.json()).catch(()=>[]),
+      ]);
+      this.me = me || {}; this.list = list || []; this.loading = false;
+    },
+    statusLabel(s){ return {registration:'报名中', auction:'拍卖中', bracket:'进行中', finished:'已结束'}[s] || s; },
+    statusClass(s){ return {
+      registration:'bg-radiant/20 text-radianthi', auction:'bg-gold/20 text-goldhi',
+      bracket:'bg-gold/20 text-goldhi', finished:'bg-panel2 text-muted'}[s] || 'bg-panel2 text-muted'; },
+
+    async create() {
+      if (this.busy) return;
+      if (!this.form.name.trim()) { this.msg='✗ 请填赛事名'; return; }
+      this.busy = true; this.msg = '';
+      try {
+        const r = await fetch('/api/tournaments', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(this.form)});
+        const j = await r.json();
+        if (j.ok) { this.list.unshift(j.tournament); this.form={name:'',per_team_budget:1000,description:''}; this.msg='✓ 已创建'; setTimeout(()=>this.msg='',2000); }
+        else this.msg = '✗ ' + (j.error || '创建失败');
+      } catch(e){ this.msg='✗ 网络错误'; } finally { this.busy=false; }
+    },
+  };
+}
+</script>
+</body></html>

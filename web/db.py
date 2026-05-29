@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     position      INTEGER,
     positions     TEXT,
     custom_tags   TEXT,
+    is_admin      INTEGER DEFAULT 0,
     created_at    INTEGER,
     updated_at    INTEGER
 );
@@ -63,6 +64,58 @@ CREATE TABLE IF NOT EXISTS highlights (
 );
 
 CREATE INDEX IF NOT EXISTS idx_highlights_created ON highlights(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS tournaments (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL,
+    description     TEXT,
+    status          TEXT DEFAULT 'registration',  -- registration / auction / bracket / finished
+    per_team_budget INTEGER DEFAULT 1000,
+    created_by      INTEGER,
+    created_at      INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS tournament_signups (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    tournament_id INTEGER NOT NULL,
+    account_id    INTEGER NOT NULL,
+    valuation     INTEGER,          -- 身价（管理员设，参考值）
+    is_captain    INTEGER DEFAULT 0,
+    team_id       INTEGER,          -- 被拍下后归属的队伍
+    auction_price INTEGER,          -- 成交价
+    created_at    INTEGER,
+    UNIQUE(tournament_id, account_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_signups_tour ON tournament_signups(tournament_id);
+
+CREATE TABLE IF NOT EXISTS teams (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    tournament_id      INTEGER NOT NULL,
+    name               TEXT NOT NULL,
+    captain_account_id INTEGER,
+    created_at         INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_teams_tour ON teams(tournament_id);
+
+CREATE TABLE IF NOT EXISTS tournament_matches (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    tournament_id  INTEGER NOT NULL,
+    round_name     TEXT,             -- 如 小组赛 / 胜者组R1 / 决赛
+    order_idx      INTEGER DEFAULT 0,
+    team_a_id      INTEGER,
+    team_b_id      INTEGER,
+    score_a        INTEGER DEFAULT 0,
+    score_b        INTEGER DEFAULT 0,
+    winner_team_id INTEGER,
+    best_of        INTEGER DEFAULT 1,
+    scheduled_time TEXT,
+    dota_match_ids TEXT,             -- 预留：关联的真实 match_id
+    created_at     INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_tmatches_tour ON tournament_matches(tournament_id, order_idx);
 """
 
 # 允许通过 POST /api/me/profile 更新的字段（用户名/密码走单独接口）
@@ -78,11 +131,15 @@ def init_db() -> None:
         if cols and "filename" in cols:
             c.execute("DROP TABLE highlights")
         c.executescript(SCHEMA)
-        # 旧 DB 没有 positions 列时无痛迁移
-        try:
-            c.execute("ALTER TABLE profiles ADD COLUMN positions TEXT")
-        except sqlite3.OperationalError:
-            pass  # 已存在
+        # 旧 DB 无痛迁移：补列
+        for ddl in (
+            "ALTER TABLE profiles ADD COLUMN positions TEXT",
+            "ALTER TABLE profiles ADD COLUMN is_admin INTEGER DEFAULT 0",
+        ):
+            try:
+                c.execute(ddl)
+            except sqlite3.OperationalError:
+                pass  # 已存在
 
 
 @contextmanager
@@ -176,6 +233,34 @@ def create_account(account_id: int, username: str, password_hash: str) -> None:
                 " VALUES (?, ?, ?, ?, ?)",
                 (account_id, username, password_hash, now, now),
             )
+
+
+# ============== ADMIN ==============
+
+def is_account_admin(account_id: int) -> bool:
+    with get_conn() as c:
+        row = c.execute("SELECT is_admin FROM profiles WHERE account_id = ?", (account_id,)).fetchone()
+    return bool(row and row["is_admin"])
+
+
+def set_admin(account_id: int, is_admin: bool) -> None:
+    """给某账号开/撤管理员权限。没有 profile 行就建一个最小行。"""
+    now = int(time.time())
+    flag = 1 if is_admin else 0
+    with get_conn() as c:
+        existing = c.execute("SELECT account_id FROM profiles WHERE account_id = ?", (account_id,)).fetchone()
+        if existing:
+            c.execute("UPDATE profiles SET is_admin = ?, updated_at = ? WHERE account_id = ?",
+                      (flag, now, account_id))
+        else:
+            c.execute("INSERT INTO profiles (account_id, is_admin, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                      (account_id, flag, now, now))
+
+
+def list_admin_account_ids() -> list[int]:
+    with get_conn() as c:
+        rows = c.execute("SELECT account_id FROM profiles WHERE is_admin = 1").fetchall()
+    return [r["account_id"] for r in rows]
 
 
 # ============== EVENTS ==============
